@@ -49,7 +49,7 @@ The goal: **drop-in freedom** for home tinkerers who want “Autodarts-style” 
 ssh pi@dart-relay.local
 
 # 1  On the Pi: install relay
-curl -sSL curl -sSL https://raw.githubusercontent.com/OpenDartboard/OpenDartboard/main/installer.sh | bash
+curl -sSL https://raw.githubusercontent.com/OpenDartboard/OpenDartboard/main/installer.sh | bash
 # Test you streams now at 
 ## http://dart-relay.local:8081/stream 
 ## http://dart-relay.local:8082/stream
