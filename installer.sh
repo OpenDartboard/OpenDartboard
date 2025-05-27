@@ -116,7 +116,7 @@ Requires=dummyfeed.service
 ExecStartPre=/bin/sh -c 'test -e ${real} || ln -sf ${dummy} ${real}'
 ExecStart=/usr/local/bin/ustreamer -d ${real} \\
   --host 0.0.0.0 --port ${port} --persistent \\
-  --resolution ${WIDTH}x${HEIGHT} --fps ${FPS}
+  --resolution ${WIDTH}x${HEIGHT} --desired-fps ${FPS}
 Restart=always
 
 [Install]
