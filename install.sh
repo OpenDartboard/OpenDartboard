@@ -3,8 +3,6 @@
 
 set -euo pipefail
 
-
-
 #############################################################################
 # ----------------------------- CLI flags ----------------------------------
 #############################################################################
@@ -33,10 +31,17 @@ echo "==> OpenDartboard install script v${VERSION}, upgrading: ${UPGRADE}, force
 echo "==> APT update & dependencies"
 sudo apt-get update -y
 sudo apt-get install -y \
-  git build-essential cmake pkg-config \
+  git \
+  cmake \
+  pkg-config \
   libopencv-dev \
-  libgstreamer1.0-dev gstreamer1.0-plugins-base gstreamer1.0-libav \
-  v4l-utils gettext-base sudo           # envsubst comes from gettext-base
+  libgstreamer1.0-dev \
+  libgstreamer-plugins-base1.0-dev \
+  gstreamer1.0-plugins-base \
+  gstreamer1.0-libav \
+  gettext-base \
+  v4l-utils \
+  sudo           # envsubst comes from gettext-base
 
 #############################################################################
 # ----------------------------- Tunables -----------------------------------
