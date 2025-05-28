@@ -1,0 +1,16 @@
+[Unit]
+Description=OpenDartboard 3-cam scorer
+After=network.target lock_cams.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/opendartboard \
+    --cams /dev/video0,/dev/video1,/dev/video2 \
+    --width ${WIDTH} --height ${HEIGHT} --fps ${FPS} \
+    --model /usr/local/share/opendartboard/models/dart.param
+Restart=always
+Nice=-5
+Environment=G_MESSAGES_MIN_LEVEL=3
+
+[Install]
+WantedBy=multi-user.target

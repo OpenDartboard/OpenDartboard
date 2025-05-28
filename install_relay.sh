@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# installer.sh – OpenDartboard relay (Pi Zero 2 W, 3-cam, minimal)
+# install-relay.sh – OpenDartboard 3-cam scorer (Pi Zero 2 W) relay-only
+# @deprecated – use install.sh instead
 
 set -euo pipefail
 
