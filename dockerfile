@@ -15,6 +15,7 @@ RUN apt-get update && apt-get install -y \
   cmake \
   libopencv-dev \
   libgstreamer1.0-dev \
+  libgstreamer-plugins-base1.0-0 \
   libgstreamer-plugins-base1.0-dev \
   gstreamer1.0-plugins-base \
   gstreamer1.0-libav \
