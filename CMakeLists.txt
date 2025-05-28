@@ -9,8 +9,8 @@ find_package(OpenCV REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GSTREAMER REQUIRED gstreamer-1.0)
 pkg_check_modules(GSTREAMER_APP REQUIRED gstreamer-app-1.0)
-pkg_check_modules(GSTREAMER_BASE REQUIRED gstbase-1.0)
-pkg_check_modules(GSTREAMER_VIDEO REQUIRED  gstvideo-1.0)
+pkg_check_modules(GSTREAMER_BASE REQUIRED gstreamer-base-1.0)
+pkg_check_modules(GSTREAMER_VIDEO REQUIRED gstvideo-1.0)
 
 add_executable(opendartboard
     src/main.cpp
@@ -24,8 +24,8 @@ target_link_libraries(opendartboard
         ${OpenCV_LIBS}
         gstreamer-1.0
         gstreamer-app-1.0
-        gstbase-1.0
-        gstvideo-1.0
+        gstreamer-base-1.0
+        gstreamer-video-1.0
 )
 
 target_compile_features(opendartboard PRIVATE cxx_std_17)
