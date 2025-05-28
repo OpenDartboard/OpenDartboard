@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # make.sh – OpenDartboard 3-cam scorer (Pi Zero 2 W)
 
-export PKG_VERSION=0.2.0
+export PKG_VERSION=0.3.0
 export PKG_NAME=opendartboard
 WIDTH=${WIDTH:-640}
 HEIGHT=${HEIGHT:-480}
@@ -22,7 +22,7 @@ Section: misc
 Priority: optional
 Architecture: arm64
 Maintainer: opendartboard community <many>
-Depends: libopencv-core4.8, gstreamer1.0-libav, libc6 (>=2.31)
+Depends: libopencv-dev, gstreamer1.0-libav
 Description: Headless 3-camera dart scorer for Pi Zero 2 W
  Prints D20|T20|MISS to stdout using YOLOv8-nano + ncnn.
 EOF
