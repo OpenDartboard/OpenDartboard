@@ -85,32 +85,32 @@ sync_repo() {                                  # sync_repo URL DIR
 # ---------------------------- build ncnn ----------------------------------
 #############################################################################
 echo "==> ncnn build starting..."
-NCNN_SRC=${PREFIX}/src/ncnn
-sync_repo "${NCNN_REPO}" "${NCNN_SRC}"
+# NCNN_SRC=${PREFIX}/src/ncnn
+# sync_repo "${NCNN_REPO}" "${NCNN_SRC}"
 
-rebuild_ncnn=0
-if [[ $FORCE -eq 1 ]]; then
-  rm -rf "${NCNN_SRC}/build"; rebuild_ncnn=1
-elif [[ ! -d "${NCNN_SRC}/build" ]]; then
-  rebuild_ncnn=1
-elif [[ $UPGRADE -eq 1 && $(stored NCNN_COMMIT) != $(commit_of "${NCNN_SRC}") ]]; then
-  rebuild_ncnn=1
-fi
+# rebuild_ncnn=0
+# if [[ $FORCE -eq 1 ]]; then
+#   rm -rf "${NCNN_SRC}/build"; rebuild_ncnn=1
+# elif [[ ! -d "${NCNN_SRC}/build" ]]; then
+#   rebuild_ncnn=1
+# elif [[ $UPGRADE -eq 1 && $(stored NCNN_COMMIT) != $(commit_of "${NCNN_SRC}") ]]; then
+#   rebuild_ncnn=1
+# fi
 
-if [[ $rebuild_ncnn -eq 1 ]]; then
-  echo "==> Building ncnn ($(commit_of "${NCNN_SRC}"))"
-  cmake -S "${NCNN_SRC}" -B "${NCNN_SRC}/build" \
-        -DNCNN_VULKAN=OFF -DNCNN_SHARED_LIB=OFF -DNCNN_INT8=ON \
-        -DCMAKE_INSTALL_PREFIX="${PREFIX}" \
-        -DCMAKE_C_FLAGS="-O3 -mfpu=neon-vfpv4 -mcpu=cortex-a53" \
-        -DCMAKE_CXX_FLAGS="-O3 -mfpu=neon-vfpv4 -mcpu=cortex-a53"
-  cmake --build "${NCNN_SRC}/build" -j4
-  sudo cmake --install "${NCNN_SRC}/build"
-  record_info NCNN_COMMIT "$(commit_of "${NCNN_SRC}")"
-  echo "==> ncnn build finished"
-else
-  echo "==> ncnn up-to-date – skipping build"
-fi
+# if [[ $rebuild_ncnn -eq 1 ]]; then
+#   echo "==> Building ncnn ($(commit_of "${NCNN_SRC}"))"
+#   cmake -S "${NCNN_SRC}" -B "${NCNN_SRC}/build" \
+#         -DNCNN_VULKAN=OFF -DNCNN_SHARED_LIB=OFF -DNCNN_INT8=ON \
+#         -DCMAKE_INSTALL_PREFIX="${PREFIX}" \
+#         -DCMAKE_C_FLAGS="-O3 -mfpu=neon-vfpv4 -mcpu=cortex-a53" \
+#         -DCMAKE_CXX_FLAGS="-O3 -mfpu=neon-vfpv4 -mcpu=cortex-a53"
+#   cmake --build "${NCNN_SRC}/build" -j4
+#   sudo cmake --install "${NCNN_SRC}/build"
+#   record_info NCNN_COMMIT "$(commit_of "${NCNN_SRC}")"
+#   echo "==> ncnn build finished"
+# else
+#   echo "==> ncnn up-to-date – skipping build"
+# fi
 
 #############################################################################
 # ------------------------- build OpenDartboard ----------------------------
