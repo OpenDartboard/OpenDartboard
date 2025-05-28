@@ -2,3 +2,4 @@
 .env
 .docker/
 docker-compose.override.yml
+/dist
