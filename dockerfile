@@ -1,8 +1,8 @@
-# Uncomment the above line if you are building for ARM architecture
-# FROM arm32v7/debian:bullseye
+# Use this line for building for ARM architecture (e.g zero 2)
+FROM arm32v7/debian:bullseye
 
 # Use this line for x86_64 architecture (testing on x86_64 only and more readily available)
-FROM debian:bullseye 
+# FROM debian:bullseye 
 
 ENV WIDTH=640 \
   HEIGHT=480 \
