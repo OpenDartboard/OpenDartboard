@@ -3,3 +3,4 @@
 .docker/
 docker-compose.override.yml
 /dist
+docker-build.log
