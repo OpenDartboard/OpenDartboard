@@ -6,6 +6,11 @@ set(CMAKE_PREFIX_PATH "/usr/local" ${CMAKE_PREFIX_PATH})
 
 find_package(OpenCV REQUIRED)
 find_library(NCNN_LIB ncnn PATHS /usr/local/lib)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(GSTREAMER REQUIRED gstreamer-1.0)
+pkg_check_modules(GSTREAMER_APP REQUIRED gstreamer-app-1.0)
+pkg_check_modules(GSTREAMER_BASE REQUIRED gstreamer-base-1.0)
+pkg_check_modules(GSTREAMER_VIDEO REQUIRED gstreamer-video-1.0)
 
 add_executable(opendartboard
     src/main.cpp
@@ -17,9 +22,10 @@ target_link_libraries(opendartboard
     PRIVATE
         ${NCNN_LIB}
         ${OpenCV_LIBS}
-        Gst::app         # GStreamer app-sink wrapper
-        Gst::base
-        Gst::video
+        gstreamer-1.0
+        gstreamer-app-1.0
+        gstreamer-base-1.0
+        gstreamer-video-1.0
 )
 
 target_compile_features(opendartboard PRIVATE cxx_std_17)
