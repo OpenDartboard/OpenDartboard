@@ -199,9 +199,13 @@ sudo envsubst < "${TEMPLATES}/opendartboard.service.template" \
 # --------------------------- enable & start -------------------------------
 #############################################################################
 echo "==> Enabling and starting services"
-sudo systemctl daemon-reload
-sudo systemctl enable --now lock_cams.service opendartboard.service
-OpenDartboard
+if pidof systemd &>/dev/null; then
+  sudo systemctl daemon-reload
+  sudo systemctl enable --now lock_cams.service opendartboard.service
+else
+  echo "==> Cannot enable, no systemd"
+fi
+
 echo
 echo "✅  OpenDartboard install/upgrade complete!"
 cat "${STATE_DIR}/.build-info"
