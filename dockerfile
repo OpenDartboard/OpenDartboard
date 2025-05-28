@@ -10,10 +10,32 @@ ENV WIDTH=640 \
   DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y \
-  git build-essential cmake libopencv-dev libgstreamer1.0-dev \
-  gstreamer1.0-plugins-base gstreamer1.0-libav gettext-base v4l-utils sudo && \
-  dpkg-query -W -f='${Package}=${Version}\n' git build-essential cmake libopencv-dev libgstreamer1.0-dev gstreamer1.0-plugins-base gstreamer1.0-libav gettext-base v4l-utils > /versions.txt && \
-  cat /versions.txt && rm -rf /var/lib/apt/lists/*
+  git \
+  build-essential \ 
+  cmake \
+  libopencv-dev \
+  libgstreamer1.0-dev \
+  libgstreamer-plugins-base1.0-dev \
+  gstreamer1.0-plugins-base \
+  gstreamer1.0-libav \
+  gettext-base \
+  v4l-utils \
+  sudo \
+  # Grab versions for debugging
+  && dpkg-query -W -f='${Package}=${Version}\n' \
+  git \
+  build-essential \ 
+  cmake \
+  libopencv-dev \
+  libgstreamer1.0-dev \
+  libgstreamer-plugins-base1.0-dev \
+  gstreamer1.0-plugins-base \
+  gstreamer1.0-libav \
+  gettext-base \
+  v4l-utils \
+  sudo \
+  # output
+  > /versions.txt && cat /versions.txt && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY . .
