@@ -1,29 +1,22 @@
 #!/bin/bash
-# build.deb.sh – Build Docker image with docker-compose, then extract .deb into ./dist
+# build.deb.sh – Build Docker image, then extract .deb into ./dist
 
 set -euo pipefail
 
-service="opendartboard"   # Your docker-compose service name
 dist="./dist"
+image="opendartboard:latest"    # Set this to your image (see 'docker images')
 
-echo "==> Running docker-compose build $service..."
-docker-compose build "$service"
+echo "==> Building image: $image"
+docker build -t "$image" . | tee docker-build.log
 
 # Ensure output folder exists
 mkdir -p "$dist"
 
-# Get the image ID from docker-compose
-imageId=$(docker-compose images "$service" --quiet | head -n1)
-if [[ -z "$imageId" ]]; then
-  echo "Could not find image for $service. Build may have failed."
-  exit 1
-fi
-
 # Create a container from the image (but don't run it)
-containerId=$(docker create "$imageId")
+containerId=$(docker create "$image")
 
-# Find the .deb file inside /app (we assume only one .deb exists)
-debInContainer=$(docker container exec "$containerId" sh -c "ls /app/*.deb 2>/dev/null | head -n1")
+# Find the .deb file inside /app (allow for any versioned name)
+debInContainer=$(docker cp "$containerId:/app" - | tar -tvf - | grep '\.deb$' | head -n1 | awk '{print $NF}')
 if [[ -z "$debInContainer" ]]; then
   echo "No .deb file found in /app inside the container."
   docker rm "$containerId" >/dev/null
@@ -33,6 +26,7 @@ fi
 debFilename=$(basename "$debInContainer")
 
 # Copy it to ./dist
+echo "==> Copying $debInContainer out to $dist/$debFilename"
 docker cp "$containerId:$debInContainer" "$dist/$debFilename"
 
 # Clean up
