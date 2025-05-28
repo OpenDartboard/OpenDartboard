@@ -1,5 +1,5 @@
 # Use this line for building for ARM architecture (e.g zero 2)
-FROM arm32v7/debian:bullseye
+FROM arm64v8/debian:bullseye
 
 # Use this line for x86_64 architecture (testing on x86_64 only and more readily available)
 # FROM debian:bullseye 
@@ -45,4 +45,4 @@ COPY . .
 RUN ./install.sh
 
 # Build everything (this only reruns if source changes or you touch build.sh)
-RUN ./build.sh
+RUN ./make.sh

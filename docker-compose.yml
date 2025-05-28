@@ -1,7 +1,7 @@
-version: '3.8'
 services:
   opendartboard:
     build: .
+    image: opendartboard:latest
     privileged: true  # Needed for camera access
     devices:
       - /dev/video0:/dev/video0
