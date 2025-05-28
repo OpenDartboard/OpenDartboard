@@ -17,15 +17,22 @@ add_executable(opendartboard
     src/scorer.cpp
 )
 
-target_include_directories(opendartboard PRIVATE /usr/local/include)
+target_include_directories(opendartboard PRIVATE
+    /usr/local/include
+    ${OpenCV_INCLUDE_DIRS}
+    ${GSTREAMER_INCLUDE_DIRS}
+    ${GSTREAMER_APP_INCLUDE_DIRS}
+    ${GSTREAMER_BASE_INCLUDE_DIRS}
+    ${GSTREAMER_VIDEO_INCLUDE_DIRS}
+)
+
 target_link_libraries(opendartboard
     PRIVATE
-        # ${NCNN_LIB}
         ${OpenCV_LIBS}
-        gstreamer-1.0
-        gstreamer-app-1.0
-        gstreamer-base-1.0
-        gstreamer-video-1.0
+        ${GSTREAMER_LIBRARIES}
+        ${GSTREAMER_APP_LIBRARIES}
+        ${GSTREAMER_BASE_LIBRARIES}
+        ${GSTREAMER_VIDEO_LIBRARIES}
 )
 
 target_compile_features(opendartboard PRIVATE cxx_std_17)
