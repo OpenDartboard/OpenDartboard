@@ -18,5 +18,8 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 COPY . .
 
-# Build step
-RUN ./install.sh --force-rebuild && ./make.sh
+# Install system deps, Python, git, etc. (this layer will be cached unless dependencies change) add --force-rebuild for a fresh rebuild
+RUN ./install.sh
+
+# Build everything (this only reruns if source changes or you touch build.sh)
+RUN ./build.sh
