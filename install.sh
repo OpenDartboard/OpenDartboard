@@ -79,6 +79,7 @@ sync_repo() {                                  # sync_repo URL DIR
 #############################################################################
 # ---------------------------- build ncnn ----------------------------------
 #############################################################################
+echo "==> ncnn build starting..."
 NCNN_SRC=${PREFIX}/src/ncnn
 sync_repo "${NCNN_REPO}" "${NCNN_SRC}"
 
@@ -101,6 +102,7 @@ if [[ $rebuild_ncnn -eq 1 ]]; then
   cmake --build "${NCNN_SRC}/build" -j4
   sudo cmake --install "${NCNN_SRC}/build"
   record_info NCNN_COMMIT "$(commit_of "${NCNN_SRC}")"
+  echo "==> ncnn build finished"
 else
   echo "==> ncnn up-to-date – skipping build"
 fi
