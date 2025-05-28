@@ -36,12 +36,17 @@ sudo apt-get install -y \
   pkg-config \
   libopencv-dev \
   libgstreamer1.0-dev \
+  libgstreamer-plugins-base1.0-0 \
   libgstreamer-plugins-base1.0-dev \
   gstreamer1.0-plugins-base \
   gstreamer1.0-libav \
   gettext-base \
   v4l-utils \
   sudo           # envsubst comes from gettext-base
+
+
+find /usr -name "libgstreamer-app-1.0*"
+bash 
 
 #############################################################################
 # ----------------------------- Tunables -----------------------------------
@@ -62,6 +67,7 @@ NCNN_REPO=https://github.com/Tencent/ncnn
 sudo mkdir -p "${PREFIX}"/{bin,src}  "${STATE_DIR}"/{models}
 sudo chown "$(id -u):$(id -g)" "${PREFIX}" "${STATE_DIR}" -R
 touch "${STATE_DIR}/.build-info" 2>/dev/null || true
+
 
 #############################################################################
 # ----------------------------- helpers ------------------------------------
