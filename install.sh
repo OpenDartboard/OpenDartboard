@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# install.sh – OpenDashboard 3-cam headless dart solution (Pi Zero 2 W)
+# install.sh – OpenDartboard 3-cam headless dart solution (Pi Zero 2 W)
 
 set -euo pipefail
 
@@ -19,13 +19,13 @@ for arg in "$@"; do
   case "$arg" in
     --upgrade)       UPGRADE=1 ;;
     --force-rebuild) FORCE=1   ;;
-    --version)       cat /usr/local/share/opendashboard/.build-info 2>/dev/null \
-                       || echo "OpenDashboard not installed yet"; exit 0 ;;
+    --version)       cat /usr/local/share/opendartboard/.build-info 2>/dev/null \
+                       || echo "OpenDartboard not installed yet"; exit 0 ;;
     --help|-h)       show_help ;;
     *) echo "Unknown flag $arg"; show_help ;;
   esac
 done
-echo "==> OpenDashboard install script v${VERSION}, upgrading: ${UPGRADE}, force rebuild: ${FORCE}"
+echo "==> OpenDartboard install script v${VERSION}, upgrading: ${UPGRADE}, force rebuild: ${FORCE}"
 
 #############################################################################
 # -------------------------- system packages -------------------------------
@@ -46,11 +46,11 @@ HEIGHT=${HEIGHT:-480}
 FPS=${FPS:-15}
 
 # Where stuff lives once installed
-PREFIX=/usr/local                             # bin + share/opendashboard
-STATE_DIR=${PREFIX}/share/opendashboard       # models + .build-info
+PREFIX=/usr/local                             # bin + share/opendartboard
+STATE_DIR=${PREFIX}/share/opendartboard       # models + .build-info
 
 # Git & model sources
-OD_REPO=https://github.com/OpenDashboard/OpenDashboard
+OD_REPO=https://github.com/OpenDartboard/OpenDartboard
 NCNN_REPO=https://github.com/Tencent/ncnn
 
 # Prep folders
@@ -106,9 +106,10 @@ else
 fi
 
 #############################################################################
-# ------------------------- build OpenDashboard ----------------------------
+# ------------------------- build OpenDartboard ----------------------------
 #############################################################################
-OD_SRC=${PREFIX}/src/opendashboard
+echo "==> OpenDartboard downloading source download and build"
+OD_SRC=${PREFIX}/src/OpenDartboard
 sync_repo "${OD_REPO}" "${OD_SRC}"
 
 rebuild_od=0
@@ -121,14 +122,14 @@ elif [[ $UPGRADE -eq 1 && $(stored OD_COMMIT) != $(commit_of "${OD_SRC}") ]]; th
 fi
 
 if [[ $rebuild_od -eq 1 ]]; then
-  echo "==> Building OpenDashboard ($(commit_of "${OD_SRC}"))"
+  echo "==> Building OpenDartboard ($(commit_of "${OD_SRC}"))"
   cmake -S "${OD_SRC}" -B "${OD_SRC}/build" \
         -DCMAKE_PREFIX_PATH="${PREFIX}"
   cmake --build "${OD_SRC}/build" -j4
-  sudo cp "${OD_SRC}/build/opendashboard" "${PREFIX}/bin/"
+  sudo cp "${OD_SRC}/build/opendartboard" "${PREFIX}/bin/"
   record_info OD_COMMIT "$(commit_of "${OD_SRC}")"
 else
-  echo "==> OpenDashboard up-to-date – skipping build"
+  echo "==> OpenDartboard up-to-date – skipping build"
 fi
 
 #############################################################################
@@ -168,18 +169,18 @@ export WIDTH HEIGHT FPS STATE_DIR PREFIX     # vars for envsubst
 sudo envsubst < "${TEMPLATES}/lock_cams.service.template" \
      | sudo tee /etc/systemd/system/lock_cams.service >/dev/null
 
-sudo envsubst < "${TEMPLATES}/opendashboard.service.template" \
-     | sudo tee /etc/systemd/system/opendashboard.service >/dev/null
+sudo envsubst < "${TEMPLATES}/opendartboard.service.template" \
+     | sudo tee /etc/systemd/system/opendartboard.service >/dev/null
 
 #############################################################################
 # --------------------------- enable & start -------------------------------
 #############################################################################
 echo "==> Enabling and starting services"
 sudo systemctl daemon-reload
-sudo systemctl enable --now lock_cams.service opendashboard.service
-
+sudo systemctl enable --now lock_cams.service opendartboard.service
+OpenDartboard
 echo
-echo "✅  OpenDashboard install/upgrade complete!"
+echo "✅  OpenDartboard install/upgrade complete!"
 cat "${STATE_DIR}/.build-info"
-echo "  • Live output:  journalctl -fu opendashboard.service"
+echo "  • Live output:  journalctl -fu opendartboard.service"
 echo "  • Re-run with  --upgrade  or  --force-rebuild  whenever needed."
