@@ -44,6 +44,14 @@ sudo apt-get install -y \
   v4l-utils \
   sudo           # envsubst comes from gettext-base
 
+
+echo "==== LIBGSTREAMER APP LIBS ===="
+find /usr -name "libgstreamer-app-1.0*" || true
+ls -l /usr/lib/*/libgstreamer-app-1.0* || true
+dpkg -l | grep gstreamer || true
+dpkg -L libgstreamer-plugins-base1.0-dev | grep app
+echo "==== END LIBGSTREAMER APP LIBS ===="
+
 #############################################################################
 # ----------------------------- Tunables -----------------------------------
 #############################################################################
@@ -145,10 +153,16 @@ fi
 # ------------------------------- model ------------------------------------
 #############################################################################
 echo "==> Checking model files"
+# Remove a file if it exists in place of the models directory
+if [ -f "${STATE_DIR}/models" ]; then
+  sudo rm -f "${STATE_DIR}/models"
+fi
+sudo mkdir -p "${STATE_DIR}/models"
+
 if [[ ! -f "${STATE_DIR}/models/dart.param" || $FORCE -eq 1 ]]; then
   echo "==> Copying built-in model files"
-  sudo cp "${OD_SRC}/models/"*.param "${STATE_DIR}/models/"
-  sudo cp "${OD_SRC}/models/"*.bin   "${STATE_DIR}/models/"
+  sudo cp "${OD_SRC}/models/"*.param "${STATE_DIR}/models/" 2>/dev/null || true
+  sudo cp "${OD_SRC}/models/"*.bin   "${STATE_DIR}/models/" 2>/dev/null || true
 else
   echo "==> Model files already present – skipping"
 fi
