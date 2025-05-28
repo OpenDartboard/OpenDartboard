@@ -1,0 +1,12 @@
+version: '3.8'
+services:
+  opendartboard:
+    build: .
+    privileged: true  # Needed for camera access
+    devices:
+      - /dev/video0:/dev/video0
+      - /dev/video1:/dev/video1
+      - /dev/video2:/dev/video2
+    volumes:
+      - .:/app
+    command: tail -f /dev/null  # Keeps container running for development
