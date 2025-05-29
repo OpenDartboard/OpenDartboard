@@ -1,0 +1,25 @@
+#!/bin/bash
+set -e
+
+# Stop and disable the services
+sudo systemctl stop opendartboard.service 2>/dev/null || true
+sudo systemctl disable opendartboard.service 2>/dev/null || true
+
+sudo systemctl stop lock_cams.service 2>/dev/null || true
+sudo systemctl disable lock_cams.service 2>/dev/null || true
+
+# Remove service symlinks (if still present)
+sudo rm -f /etc/systemd/system/multi-user.target.wants/opendartboard.service
+sudo rm -f /etc/systemd/system/multi-user.target.wants/lock_cams.service
+
+# Remove service files (if not owned by .deb, adjust as needed)
+sudo rm -f /lib/systemd/system/opendartboard.service
+sudo rm -f /lib/systemd/system/lock_cams.service
+
+# Reload systemd so it forgets deleted services
+sudo systemctl daemon-reload
+
+# (Optionally kill stray running processes, just in case)
+sudo killall opendartboard 2>/dev/null || true
+
+echo "✅ All opendartboard services stopped, disabled, and cleaned up."
