@@ -1,0 +1,9 @@
+Package: ${PKG_NAME}
+Version: ${PKG_VERSION}-1
+Section: misc
+Priority: optional
+Architecture: arm64
+Maintainer: opendartboard community <many>
+Depends: libopencv-dev, gstreamer1.0-libav
+Description: Headless 3-camera dart scorer for Pi Zero 2 W
+  Prints D20|T20|MISS to stdout using YOLOv8-nano + ncnn.
