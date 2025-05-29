@@ -7,6 +7,9 @@ Type=simple
 ExecStart=/usr/local/bin/lock_cams.sh
 Restart=always
 RestartSec=2
+# Avoid spewing to the console during package install
+StandardOutput=journal
+StandardError=inherit
 
 [Install]
 WantedBy=multi-user.target
