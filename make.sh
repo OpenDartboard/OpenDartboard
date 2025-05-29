@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # make.sh – OpenDartboard 3-cam scorer (Pi Zero 2 W)
 
-export PKG_VERSION=0.4.0
+export PKG_VERSION=0.6.0
 export PKG_NAME=opendartboard
 WIDTH=${WIDTH:-640}
 HEIGHT=${HEIGHT:-480}
@@ -18,6 +18,8 @@ mkdir -p ${PKG_NAME}_${PKG_VERSION}/DEBIAN
 envsubst < distributions/debian_arm64/control > ${PKG_NAME}_${PKG_VERSION}/DEBIAN/control
 envsubst < distributions/debian_arm64/postinst > ${PKG_NAME}_${PKG_VERSION}/DEBIAN/postinst
 chmod +x ${PKG_NAME}_${PKG_VERSION}/DEBIAN/postinst
+envsubst < distributions/debian_arm64/postrm > ${PKG_NAME}_${PKG_VERSION}/DEBIAN/postrm
+chmod +x ${PKG_NAME}_${PKG_VERSION}/DEBIAN/postrm
 
 # Generate service files from templates
 envsubst < templates/opendartboard.service.template > opendartboard.service
