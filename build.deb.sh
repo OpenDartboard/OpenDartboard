@@ -6,6 +6,9 @@ set -euo pipefail
 dist="./dist"
 image="opendartboard:latest"    # Set this to your image (see 'docker images')
 
+# remove old dist folder and all contents
+rm -rf "$dist"
+
 echo "==> Building image: $image"
 docker build -t "$image" . | tee docker-build.log
 
