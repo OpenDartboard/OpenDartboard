@@ -4,6 +4,6 @@ Section: misc
 Priority: optional
 Architecture: arm64
 Maintainer: opendartboard community <many>
-Depends: libopencv-dev, gstreamer1.0-libav
+Depends: libopencv-dev, gstreamer1.0-libav, v4l-utils
 Description: Headless 3-camera dart scorer for Pi Zero 2 W
   Prints D20|T20|MISS to stdout using YOLOv8-nano + ncnn.
