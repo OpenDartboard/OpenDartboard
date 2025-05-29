@@ -3,9 +3,10 @@ Description=Set webcams to MJPEG ${WIDTH}×${HEIGHT} @ ${FPS} fps
 After=multi-user.target
 
 [Service]
-Type=oneshot
+Type=simple
 ExecStart=/usr/local/bin/lock_cams.sh
-RemainAfterExit=yes
+Restart=always
+RestartSec=2
 
 [Install]
 WantedBy=multi-user.target
