@@ -23,6 +23,8 @@ chmod +x ${PKG_NAME}_${PKG_VERSION}/DEBIAN/postinst
 envsubst < templates/opendartboard.service.template > opendartboard.service
 envsubst < templates/lock_cams.service.template > lock_cams.service
 
+install -Dm755 scripts/lock_cams.sh ${PKG_NAME}_${PKG_VERSION}/usr/local/bin/lock_cams.sh
+
 # (Optional) systemd unit in /lib/systemd/system
 install -Dm644 opendartboard.service \
      ${PKG_NAME}_${PKG_VERSION}/lib/systemd/system/opendartboard.service
