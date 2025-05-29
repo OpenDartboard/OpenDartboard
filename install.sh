@@ -6,7 +6,7 @@ set -euo pipefail
 #############################################################################
 # ----------------------------- CLI flags ----------------------------------
 #############################################################################
-VERSION=0.1.0
+VERSION=0.2.0
 UPGRADE=0
 FORCE=0
 show_help() {
@@ -30,27 +30,7 @@ echo "==> OpenDartboard install script v${VERSION}, upgrading: ${UPGRADE}, force
 #############################################################################
 echo "==> APT update & dependencies"
 sudo apt-get update -y
-sudo apt-get install -y \
-  git \
-  cmake \
-  pkg-config \
-  libopencv-dev \
-  libgstreamer1.0-dev \
-  libgstreamer-plugins-base1.0-0 \
-  libgstreamer-plugins-base1.0-dev \
-  gstreamer1.0-plugins-base \
-  gstreamer1.0-libav \
-  gettext-base \
-  v4l-utils \
-  sudo           # envsubst comes from gettext-base
-
-
-echo "==== LIBGSTREAMER APP LIBS ===="
-find /usr -name "libgstreamer-app-1.0*" || true
-ls -l /usr/lib/*/libgstreamer-app-1.0* || true
-dpkg -l | grep gstreamer || true
-dpkg -L libgstreamer-plugins-base1.0-dev | grep app
-echo "==== END LIBGSTREAMER APP LIBS ===="
+xargs sudo apt-get install -y < "$(dirname "$0")/apt-packages.txt"
 
 #############################################################################
 # ----------------------------- Tunables -----------------------------------
@@ -171,16 +151,7 @@ fi
 # -------------------------- camera lock script ----------------------------
 #############################################################################
 echo "==> Creating camera lock script"
-sudo tee /usr/local/bin/lock_cams.sh >/dev/null <<EOF
-#!/usr/bin/env bash
-for d in /dev/video{0,1,2}; do
-  [[ -e \$d ]] || continue
-  v4l2-ctl -d \$d --set-fmt-video=width=${WIDTH},height=${HEIGHT},pixelformat=MJPG \
-                   --set-parm=${FPS} \
-                   --set-ctrl=power_line_frequency=1,exposure_auto_priority=0
-done
-EOF
-sudo chmod +x /usr/local/bin/lock_cams.sh
+install -Dm755 scripts/lock_cams.sh /usr/local/bin/lock_cams.sh
 
 #############################################################################
 # ----------------------------- unit files ---------------------------------
@@ -211,3 +182,4 @@ echo "✅  OpenDartboard install/upgrade complete!"
 cat "${STATE_DIR}/.build-info"
 echo "  • Live output:  journalctl -fu opendartboard.service"
 echo "  • Re-run with  --upgrade  or  --force-rebuild  whenever needed."
+echo "==END of Install=="
