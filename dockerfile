@@ -10,7 +10,7 @@ ENV WIDTH=640 \
   DEBIAN_FRONTEND=noninteractive
 
 COPY apt-packages.txt /tmp/
-RUN xargs apt-get install -y < /tmp/apt-packages.txt
+RUN apt-get update -y && xargs apt-get install -y < /tmp/apt-packages.txt
 
 WORKDIR /app
 COPY . .
