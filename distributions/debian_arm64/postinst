@@ -1,6 +1,11 @@
 #!/bin/bash
 set -e
 systemctl daemon-reload
+
+# Make them come up every boot
+systemctl enable lock_cams.service
+systemctl enable opendartboard.service
+
 systemctl start --no-block lock_cams.service
 systemctl start --no-block opendartboard.service
 exit 0
