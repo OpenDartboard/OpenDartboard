@@ -1,6 +1,6 @@
 [Unit]
 Description=OpenDartboard 3-cam scorer
-After=network.target lock_cams.service
+After=network.target
 
 [Service]
 Type=simple
@@ -11,6 +11,8 @@ ExecStart=/usr/local/bin/opendartboard \
 Restart=always
 Nice=-5
 Environment=G_MESSAGES_MIN_LEVEL=3
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
