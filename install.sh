@@ -23,7 +23,8 @@ for arg in "$@"; do
     *) echo "Unknown flag $arg"; show_help ;;
   esac
 done
-echo "==> OpenDartboard install script v${VERSION}, upgrading: ${UPGRADE}, force rebuild: ${FORCE}"
+echo "==> OpenDartboard install script v${VERSION}."
+echo "==> Config: [upgrading: ${UPGRADE}, force_rebuild: ${FORCE}]"
 
 #############################################################################
 # -------------------------- system packages -------------------------------
