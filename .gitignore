@@ -1,6 +1,8 @@
 # Docker
 .env
 .docker/
+.commands
 docker-compose.override.yml
 /dist
 docker-build.log
+/build
