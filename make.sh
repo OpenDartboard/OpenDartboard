@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
 # make.sh – OpenDartboard 3-cam scorer (Pi Zero 2 W)
 
-export PKG_VERSION=0.7.0
+export PKG_VERSION=0.11.0
 export PKG_NAME=opendartboard
 WIDTH=${WIDTH:-640}
 HEIGHT=${HEIGHT:-480}
 FPS=${FPS:-15}
+
+# output config and build info
+echo "==> OpenDartboard build script v${PKG_VERSION}"
+echo "==> Config: [width: ${WIDTH}, height: ${HEIGHT}, fps: ${FPS}]"
 
 # setup the build environment
 mkdir -p ${PKG_NAME}_${PKG_VERSION}/usr/local/{bin,share/opendartboard/models}
