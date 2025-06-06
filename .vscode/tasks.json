@@ -1,0 +1,12 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Export Includes from Docker",
+            "type": "shell",
+            "command": "bash scripts/export-includes.sh",
+            "problemMatcher": [],
+            "group": "build"
+        }
+    ]
+}
