@@ -1,0 +1,71 @@
+#pragma once
+#include "../dart_detector.hpp"
+#include "yolo_detector.hpp"
+#include <memory>
+
+class AIDetector : public DartDetector
+{
+public:
+    AIDetector() = default;
+    ~AIDetector() override = default;
+
+    bool initialize(const std::string &model_path) override
+    {
+        // Extract bin path from param path
+        std::string bin_path = model_path;
+        size_t param_pos = bin_path.find(".param");
+        if (param_pos != std::string::npos)
+        {
+            bin_path.replace(param_pos, 6, ".bin");
+        }
+
+        // Create YOLO detector
+        yolo = std::make_unique<YOLODetector>(model_path, bin_path);
+        return yolo->isLoaded();
+    }
+
+    std::vector<DartDetection> detectDarts(const std::vector<cv::Mat> &frames) override
+    {
+        std::vector<DartDetection> results;
+
+        if (!yolo || !yolo->isLoaded())
+        {
+            return results;
+        }
+
+        // Process each frame
+        for (const auto &frame : frames)
+        {
+            auto yolo_detections = yolo->detect(frame);
+
+            // Convert YOLODetector detections to our interface format
+            for (const auto &det : yolo_detections)
+            {
+                DartDetection dart_det;
+
+                // Convert bbox center to position
+                dart_det.position = cv::Point(
+                    det.bbox.x + det.bbox.width / 2,
+                    det.bbox.y + det.bbox.height / 2);
+
+                dart_det.confidence = det.confidence;
+
+                // Currently we don't map to scores in the YOLO implementation
+                // This will be added in a future version
+                dart_det.score = "";
+
+                results.push_back(dart_det);
+            }
+        }
+
+        return results;
+    }
+
+    bool isInitialized() const override
+    {
+        return yolo && yolo->isLoaded();
+    }
+
+private:
+    std::unique_ptr<YOLODetector> yolo;
+};

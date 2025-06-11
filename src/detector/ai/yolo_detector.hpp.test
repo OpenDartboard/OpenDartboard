@@ -1,0 +1,50 @@
+#pragma once
+#include <string>
+#include <vector>
+#include <opencv2/opencv.hpp>
+#include <ncnn/net.h>
+
+// Structure to hold detection results
+struct Detection
+{
+    cv::Rect_<float> bbox;  // Bounding box (x, y, width, height)
+    float confidence;       // Confidence score (0-1)
+    int class_id;           // Class ID (for multiple object types)
+    std::string class_name; // Class name (dart, etc)
+};
+
+class YOLODetector
+{
+public:
+    // Constructor takes paths to model files and confidence threshold
+    YOLODetector(const std::string &param_path,
+                 const std::string &bin_path,
+                 float conf_threshold = 0.25f,
+                 float nms_threshold = 0.45f);
+
+    // Destructor
+    ~YOLODetector();
+
+    // Detect objects in a single image
+    std::vector<Detection> detect(const cv::Mat &image);
+
+    // Check if the model was loaded successfully
+    bool isLoaded() const { return model_loaded; }
+
+private:
+    // ncnn model
+    ncnn::Net net;
+
+    // Model configuration
+    bool model_loaded;
+    float confidence_threshold;
+    float nms_threshold;
+    int input_width;
+    int input_height;
+
+    // Preprocessing helpers
+    void preprocess(const cv::Mat &image, ncnn::Mat &in);
+
+    // Postprocessing helpers
+    std::vector<Detection> postprocess(ncnn::Mat &out, const cv::Size &original_size);
+};
