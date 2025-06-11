@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # lock_cams.sh – keep all webcams in the requested MJPEG mode forever.
 
-WIDTH=${WIDTH:-1280}
-HEIGHT=${HEIGHT:-720}
+WIDTH=${WIDTH:-640}
+HEIGHT=${HEIGHT:-360}
 FPS=${FPS:-10}
 PIXELFORMAT=${PIXELFORMAT:-MJPG}
 
