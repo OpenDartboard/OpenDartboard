@@ -16,6 +16,14 @@ if(NOT OpenCV_FOUND)
     set(OpenCV_LIBS ${OPENCV_LIBRARIES})
 endif()
 
+# Find ncnn package
+find_package(ncnn QUIET)
+if(NOT ncnn_FOUND)
+    message(WARNING "ncnn not found in system, using library in /usr/local")
+    set(NCNN_INCLUDE_DIRS "/usr/local/include/ncnn")
+    set(NCNN_LIBRARIES "/usr/local/lib/libncnn.a")
+endif()
+
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GSTREAMER REQUIRED gstreamer-1.0)
 pkg_check_modules(GSTREAMER_APP REQUIRED gstreamer-app-1.0)
@@ -25,11 +33,16 @@ pkg_check_modules(GSTREAMER_VIDEO REQUIRED gstreamer-video-1.0)
 add_executable(opendartboard
     src/main.cpp
     src/scorer/scorer.cpp
+    # src/detector/ai/yolo_detector.cpp
+    src/detector/geometry/geometry_detector.cpp
+    src/detector/geometry/geometry_dartboard.cpp
+    src/detector/geometry/geometry_calibration.cpp
 )
 
 target_include_directories(opendartboard PRIVATE
     /usr/local/include
     ${OpenCV_INCLUDE_DIRS}
+    ${NCNN_INCLUDE_DIRS}
     ${GSTREAMER_INCLUDE_DIRS}
     ${GSTREAMER_APP_INCLUDE_DIRS}
     ${GSTREAMER_BASE_INCLUDE_DIRS}
@@ -41,6 +54,7 @@ target_include_directories(opendartboard PRIVATE
 target_link_libraries(opendartboard
     PRIVATE
         ${OpenCV_LIBS}
+        ${NCNN_LIBRARIES}
         ${GSTREAMER_LIBRARIES}
         ${GSTREAMER_APP_LIBRARIES}
         ${GSTREAMER_BASE_LIBRARIES}
