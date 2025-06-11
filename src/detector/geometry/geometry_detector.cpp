@@ -1,5 +1,8 @@
 #include "geometry_detector.hpp"
 #include "geometry_dartboard.hpp"
+#include "utils/dartboard_visualization.hpp"
+#include "utils/math_utils.hpp"
+#include "utils/color_utils.hpp" // Include new color utilities
 #include <iostream>
 #include <algorithm>
 
@@ -12,27 +15,22 @@ GeometryDetector::GeometryDetector(bool debug_mode, int target_width, int target
 {
 }
 
-GeometryDetector::~GeometryDetector()
+bool GeometryDetector::initialize(const string &config_path)
 {
-    // Nothing to clean up
-}
-
-bool GeometryDetector::initialize(const std::string &config_path)
-{
-    std::cout << "Initializing geometry detector..." << std::endl;
+    cout << "Initializing geometry detector..." << endl;
     initialized = true;
     calibrated = false;
     return true;
 }
 
-bool GeometryDetector::initialize(const std::string &config_path, const std::vector<cv::Mat> &initial_frames)
+bool GeometryDetector::initialize(const string &config_path, const vector<cv::Mat> &initial_frames)
 {
     if (!initialize(config_path))
         return false;
 
     if (!initial_frames.empty())
     {
-        std::cout << "Performing immediate calibration..." << std::endl;
+        cout << "Performing immediate calibration..." << endl;
 
         calibrated = calibrateDartboard(initial_frames);
         if (calibrated)
@@ -42,18 +40,19 @@ bool GeometryDetector::initialize(const std::string &config_path, const std::vec
             for (const auto &frame : initial_frames)
                 background_frames.push_back(frame.clone());
 
-            std::cout << "Initial calibration completed successfully" << std::endl;
+            cout << "Initial calibration completed successfully" << endl;
         }
         else
         {
-            std::cerr << "Initial calibration failed" << std::endl;
+            cerr << "Initial calibration failed" << endl;
         }
     }
 
     return initialized;
 }
 
-std::vector<DartDetection> GeometryDetector::detectDarts(const std::vector<cv::Mat> &frames)
+// Detect darts in the provided frames
+vector<DartDetection> GeometryDetector::detectDarts(const vector<cv::Mat> &frames)
 {
     // Calibrate if needed
     if (!calibrated)
@@ -70,7 +69,7 @@ std::vector<DartDetection> GeometryDetector::detectDarts(const std::vector<cv::M
     }
 
     // Process each camera frame to find darts
-    std::vector<DartDetection> all_detections;
+    vector<DartDetection> all_detections;
 
     for (size_t i = 0; i < frames.size() && i < calibrations.size(); i++)
     {
@@ -81,7 +80,7 @@ std::vector<DartDetection> GeometryDetector::detectDarts(const std::vector<cv::M
         // Find darts in this camera's frame
         Mat curr_processed = preprocessFrame(frames[i]);
         Mat bg_processed = preprocessFrame(background_frames[i]);
-        std::vector<DartDetection> camera_detections = findDarts(curr_processed, bg_processed);
+        vector<DartDetection> camera_detections = findDarts(curr_processed, bg_processed);
 
         // Set camera index for each detection
         for (auto &det : camera_detections)
@@ -93,13 +92,15 @@ std::vector<DartDetection> GeometryDetector::detectDarts(const std::vector<cv::M
 
     // Show multi-camera debug view
     if (debug_mode && !all_detections.empty())
-        saveMultiCameraDebugView(frames, all_detections);
+    {
+        dartboard_visualization::saveMultiCameraDebugView(frames, calibrations, all_detections, target_width, target_height, false);
+    }
 
     return all_detections;
 }
 
 // Detect darts using background subtraction and contour analysis
-std::vector<DartDetection> GeometryDetector::findDarts(const Mat &frame, const Mat &background)
+vector<DartDetection> GeometryDetector::findDarts(const Mat &frame, const Mat &background)
 {
     if (frame.empty() || background.empty())
         return {};
@@ -122,11 +123,11 @@ std::vector<DartDetection> GeometryDetector::findDarts(const Mat &frame, const M
     morphologyEx(thresh, thresh, MORPH_OPEN, getStructuringElement(MORPH_ELLIPSE, Size(3, 3)));
 
     // Find contours in the thresholded image
-    std::vector<std::vector<Point>> contours;
+    vector<vector<Point>> contours;
     findContours(thresh, contours, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE);
 
     // Process contours to find dart candidates
-    std::vector<DartDetection> all_detections;
+    vector<DartDetection> all_detections;
 
     for (const auto &contour : contours)
     {
@@ -142,14 +143,14 @@ std::vector<DartDetection> GeometryDetector::findDarts(const Mat &frame, const M
 
         // Find point closest to any dartboard center
         Point best_point(-1, -1);
-        double min_dist = std::numeric_limits<double>::max();
+        double min_dist = numeric_limits<double>::max();
         const DartboardCalibration *closest_calib = nullptr;
 
         for (const auto &calib : calibrations)
         {
             for (const auto &pt : contour)
             {
-                double dist = distanceToPoint(pt, calib.center);
+                double dist = math_utils::distanceToPoint(pt, calib.center);
                 if (dist < min_dist)
                 {
                     min_dist = dist;
@@ -162,26 +163,26 @@ std::vector<DartDetection> GeometryDetector::findDarts(const Mat &frame, const M
         // Validate dart candidate
         if (best_point.x >= 0 && closest_calib)
         {
-            double dist_to_center = distanceToPoint(best_point, closest_calib->center);
+            double dist_to_center = math_utils::distanceToPoint(best_point, closest_calib->center);
             if (dist_to_center <= closest_calib->radius * 1.5)
             {
                 // Create detection
                 DartDetection detection;
                 detection.position = best_point;
                 detection.confidence = 0.9 - (dist_to_center / (closest_calib->radius * 2.0));
-                detection.score = determineScore(best_point, *closest_calib);
+                detection.score = GeometryDartboard::calculateScore(best_point, *closest_calib);
                 all_detections.push_back(detection);
             }
         }
     }
 
     // Remove duplicates
-    std::vector<DartDetection> filtered_detections;
-    std::sort(all_detections.begin(), all_detections.end(),
-              [](const DartDetection &a, const DartDetection &b)
-              {
-                  return a.confidence > b.confidence;
-              });
+    vector<DartDetection> filtered_detections;
+    sort(all_detections.begin(), all_detections.end(),
+         [](const DartDetection &a, const DartDetection &b)
+         {
+             return a.confidence > b.confidence;
+         });
 
     const int DUPLICATE_THRESHOLD = 15;
     for (const auto &det : all_detections)
@@ -189,7 +190,7 @@ std::vector<DartDetection> GeometryDetector::findDarts(const Mat &frame, const M
         bool is_duplicate = false;
         for (const auto &accepted : filtered_detections)
         {
-            if (distanceToPoint(det.position, accepted.position) < DUPLICATE_THRESHOLD)
+            if (math_utils::distanceToPoint(det.position, accepted.position) < DUPLICATE_THRESHOLD)
             {
                 is_duplicate = true;
                 break;
@@ -226,201 +227,373 @@ cv::Mat GeometryDetector::preprocessFrame(const cv::Mat &frame, bool preserveCol
     return gray;
 }
 
-// Wrapper for dartboard renderer drawing function
-void GeometryDetector::drawDartboardCalibration(cv::Mat &frame,
-                                                const DartboardCalibration &calib,
-                                                bool detailed)
+// IMPROVED: More robust color-based dartboard detection that starts from the center
+bool GeometryDetector::findDartboardCircle(const cv::Mat &frame, cv::Point &center, double &radius, int camera_idx)
 {
-    // Create a copy with fixed orientation
-    DartboardCalibration fixedCalib = calib;
-    fixedCalib.orientation = 270.0; // Always use standard orientation
-    GeometryDartboard::drawCalibrationOverlay(frame, fixedCalib, detailed);
-}
+    // Enhanced logging for better debugging
+    cout << "DEBUG-FIND: Starting circle detection for camera " << camera_idx + 1
+         << " (" << frame.cols << "x" << frame.rows << ")" << endl;
 
-// Wrapper for score calculation
-std::string GeometryDetector::determineScore(const cv::Point &dartPosition,
-                                             const DartboardCalibration &calib)
-{
-    return GeometryDartboard::calculateScore(dartPosition, calib);
-}
+    // We need a color image for this approach
+    if (frame.empty())
+        return false;
 
-// NEW: Utility method to scale calibration parameters for visualization
-DartboardCalibration GeometryDetector::scaleCalibrationForDisplay(
-    const DartboardCalibration &calib,
-    const cv::Mat &originalFrame,
-    int targetWidth, int targetHeight,
-    cv::Point &outOffset)
-{
-    // Create a copy to modify
-    DartboardCalibration scaledCalib = calib;
-
-    // Calculate aspect ratio-preserving dimensions
-    double aspectRatio = originalFrame.cols / (double)originalFrame.rows;
-    int scaledWidth = targetWidth;
-    int scaledHeight = static_cast<int>(scaledWidth / aspectRatio);
-
-    // If height exceeds target, scale down proportionally
-    if (scaledHeight > targetHeight)
+    // Must be a color image
+    cv::Mat colorFrame;
+    if (frame.channels() == 3)
+        colorFrame = frame.clone();
+    else
     {
-        scaledHeight = targetHeight;
-        scaledWidth = static_cast<int>(scaledHeight * aspectRatio);
+        cv::cvtColor(frame, colorFrame, cv::COLOR_GRAY2BGR);
+        cerr << "Warning: Using grayscale image for color-based detection" << endl;
     }
 
-    // Calculate offset to center frame on black background
-    outOffset.x = (targetWidth - scaledWidth) / 2;
-    outOffset.y = (targetHeight - scaledHeight) / 2;
+    // Create debug visualization
+    cv::Mat debugVis;
+    if (debug_mode)
+        debugVis = colorFrame.clone();
 
-    // Calculate scale factors
-    double scaleX = scaledWidth / (double)originalFrame.cols;
-    double scaleY = scaledHeight / (double)originalFrame.rows;
+    // STEP 1: Start with the assumption that bull's eye is near center of frame
+    cv::Point frameCenter(frame.cols / 2, frame.rows / 2);
 
-    // Apply scale and offset to center point
-    scaledCalib.center.x = static_cast<int>(scaledCalib.center.x * scaleX) + outOffset.x;
-    scaledCalib.center.y = static_cast<int>(scaledCalib.center.y * scaleY) + outOffset.y;
+    // Define initial search area around center (use 40% of frame dimension)
+    int searchRadius = min(frame.cols, frame.rows) * 0.4;
+    cv::Rect centerRegion(
+        max(0, frameCenter.x - searchRadius),
+        max(0, frameCenter.y - searchRadius),
+        min(frame.cols - 1, searchRadius * 2),
+        min(frame.rows - 1, searchRadius * 2));
 
-    // Use the smaller scale factor to avoid oval shapes
-    double scaleFactor = std::min(scaleX, scaleY);
-    scaledCalib.radius *= scaleFactor;
+    // Convert to HSV for better color segmentation
+    cv::Mat hsvFrame;
+    cv::cvtColor(colorFrame, hsvFrame, cv::COLOR_BGR2HSV);
 
-    // Update all ring proportions
-    scaledCalib.bullRadius = scaledCalib.radius * 0.07;
-    scaledCalib.doubleRingInner = scaledCalib.radius * 0.92;
-    scaledCalib.doubleRingOuter = scaledCalib.radius;
-    scaledCalib.tripleRingInner = scaledCalib.radius * 0.55;
-    scaledCalib.tripleRingOuter = scaledCalib.radius * 0.63;
+    // STEP 2: Create improved color masks with more precise thresholds
+    cv::Mat redMask1, redMask2, redMask, greenMask;
 
-    return scaledCalib;
-}
+    // Red comes in two ranges in HSV space
+    cv::inRange(hsvFrame, cv::Scalar(0, 100, 70), cv::Scalar(8, 255, 255), redMask1);
+    cv::inRange(hsvFrame, cv::Scalar(172, 100, 70), cv::Scalar(180, 255, 255), redMask2);
+    redMask = redMask1 | redMask2;
 
-// Unified visualization function that shows all cameras
-void GeometryDetector::saveMultiCameraDebugView(const std::vector<cv::Mat> &frames,
-                                                const std::vector<DartDetection> &detections)
-{
-    if (!debug_mode || frames.empty())
-        return;
+    // Green ring detection
+    cv::inRange(hsvFrame, cv::Scalar(35, 50, 50), cv::Scalar(85, 255, 255), greenMask);
 
-    // Create resized frames
-    std::vector<cv::Mat> resized_frames;
-    std::vector<cv::Point> offsets; // Store offsets for each frame
-    int max_width = 0, total_height = 0;
+    // Combined color mask
+    cv::Mat colorMask = redMask | greenMask;
 
-    for (const auto &frame : frames)
+    // Apply morphology to clean noise
+    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3, 3));
+    cv::morphologyEx(colorMask, colorMask, cv::MORPH_OPEN, kernel);
+    cv::morphologyEx(colorMask, colorMask, cv::MORPH_CLOSE, kernel);
+
+    if (debug_mode)
     {
-        cv::Mat resized;
+        // Create visualization showing red and green parts separately
+        cv::Mat colorMaskVis = cv::Mat::zeros(colorFrame.size(), CV_8UC3);
+
+        for (int y = 0; y < colorFrame.rows; y++)
+        {
+            for (int x = 0; x < colorFrame.cols; x++)
+            {
+                if (redMask.at<uchar>(y, x) > 0)
+                    colorMaskVis.at<cv::Vec3b>(y, x) = cv::Vec3b(0, 0, 255); // Red
+                else if (greenMask.at<uchar>(y, x) > 0)
+                    colorMaskVis.at<cv::Vec3b>(y, x) = cv::Vec3b(0, 255, 0); // Green
+            }
+        }
+
+        // Draw frame center and search region
+        cv::circle(colorMaskVis, frameCenter, 10, cv::Scalar(255, 255, 255), 2);
+        cv::rectangle(colorMaskVis, centerRegion, cv::Scalar(255, 255, 255), 2);
+
+        cv::imwrite("debug_frames/circles/color_mask.jpg", colorMaskVis);
+    }
+
+    // STEP 3: FIRST look for the bull's eye (red circle) near center of frame
+    cv::Mat centerRedMask = redMask(centerRegion);
+
+    // Find contours in the center region red mask
+    vector<vector<cv::Point>> bullContours;
+    cv::findContours(centerRedMask, bullContours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+
+    // Filter bull contours by size and circularity
+    cv::Point bullCenter(-1, -1);
+    double bullRadius = 0;
+    double bestBullScore = 0;
+
+    for (const auto &contour : bullContours)
+    {
+        double area = cv::contourArea(contour);
+        if (area < 20)
+            continue; // Skip tiny contours
+
+        cv::Point2f center;
+        float radius;
+        cv::minEnclosingCircle(contour, center, radius);
+
+        // Convert back to absolute coordinates
+        center.x += centerRegion.x;
+        center.y += centerRegion.y;
+
+        // Score based on circularity and proximity to frame center
+        double circularity = area / (CV_PI * radius * radius);
+        double centerDistance = cv::norm(cv::Point2f(frameCenter) - center);
+        double centralityScore = 1.0 - (centerDistance / (searchRadius * 1.5));
+        double score = circularity * 0.6 + centralityScore * 0.4;
+
+        if (score > bestBullScore)
+        {
+            bestBullScore = score;
+            bullCenter = cv::Point(center.x, center.y);
+            bullRadius = radius;
+        }
+    }
+
+    // If we found a good bull's eye, use it as our center
+    bool foundBull = (bullCenter.x > 0 && bestBullScore > 0.5);
+    if (foundBull)
+    {
+        center = bullCenter;
+
+        if (debug_mode)
+        {
+            cv::circle(debugVis, bullCenter, bullRadius, cv::Scalar(255, 255, 0), 2);
+            cv::putText(debugVis, "BULL", bullCenter + cv::Point(-20, -20),
+                        cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255, 255, 0), 2);
+        }
+    }
+    else
+    {
+        // Fall back to frame center if bull not detected
+        center = frameCenter;
+    }
+
+    // Add debug logging at key points
+    cout << "DEBUG-FIND: Starting circle detection" << endl;
+
+    // STEP 4: Now look for the dartboard outer circle using the full color mask
+    // Look for contours in wider area around detected bull center
+    int outerSearchRadius = min(frame.cols, frame.rows) * 0.6;
+    cv::Rect dartboardRegion(
+        max(0, center.x - outerSearchRadius),
+        max(0, center.y - outerSearchRadius),
+        min(frame.cols - 1, outerSearchRadius * 2),
+        min(frame.rows - 1, outerSearchRadius * 2));
+
+    // We need to adjust the mask ROI
+    cv::Mat dartboardMask;
+    if (dartboardRegion.x >= 0 && dartboardRegion.y >= 0 &&
+        dartboardRegion.x + dartboardRegion.width <= colorMask.cols &&
+        dartboardRegion.y + dartboardRegion.height <= colorMask.rows)
+    {
+
+        dartboardMask = colorMask(dartboardRegion);
+    }
+    else
+    {
+        dartboardMask = colorMask;
+    }
+
+    vector<vector<cv::Point>> dartboardContours;
+    cv::findContours(dartboardMask, dartboardContours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+
+    // Use circle fitting to find the outer ring
+    radius = 0;
+    float bestCircleScore = 0;
+
+    for (const auto &contour : dartboardContours)
+    {
+        // Convert contour points to absolute coordinates
+        vector<cv::Point> absContour;
+        for (const auto &p : contour)
+        {
+            absContour.push_back(cv::Point(p.x + dartboardRegion.x, p.y + dartboardRegion.y));
+        }
+
+        // Skip small contours
+        if (absContour.size() < 10)
+            continue;
+
+        // Try to fit a circle to this contour
+        cv::Point2f contourCenter;
+        float contourRadius;
+        cv::minEnclosingCircle(absContour, contourCenter, contourRadius);
+
+        // Calculate distance from bull center to this contour center
+        double centerDistance = cv::norm(cv::Point2f(center) - contourCenter);
+
+        // Score: prioritize circles close to our detected bull center
+        double centralityScore = 1.0 - (centerDistance / (outerSearchRadius / 2.0));
+        centralityScore = max(0.0, min(1.0, centralityScore));
+
+        // Score: prioritize larger circles (more likely to be the dartboard)
+        double sizeScore = contourRadius / (outerSearchRadius / 2.0);
+        sizeScore = min(1.0, sizeScore);
+
+        // Calculate overall score
+        double score = centralityScore * 0.7 + sizeScore * 0.3;
+
+        if (score > bestCircleScore && contourRadius > 20)
+        {
+            bestCircleScore = score;
+            radius = contourRadius;
+            // Keep the bull center we found, just update radius
+        }
+    }
+
+    // If we couldn't find a good radius from the color detection
+    if (radius <= 20)
+    {
+        // Estimate radius from image dimensions
+        radius = min(frame.cols, frame.rows) / 3.0;
+    }
+
+    // STEP 5: Create debug visualization
+    if (debug_mode)
+    {
+        // Create a temporary calibration object for visualization
+        DartboardCalibration tempCalib;
+        tempCalib.center = center;
+        tempCalib.radius = radius;
+        tempCalib.orientation = 270.0; // Fixed - segment 20 at top
+        tempCalib.camera_index = camera_idx;
+
+        // Set standard ring proportions
+        tempCalib.bullRadius = radius * 0.07;
+        tempCalib.doubleRingInner = radius * 0.92;
+        tempCalib.doubleRingOuter = radius;
+        tempCalib.tripleRingInner = radius * 0.55;
+        tempCalib.tripleRingOuter = radius * 0.63;
+
+        // Create debug view and scale calibration using shared utility method
+        cv::Mat debugVis = cv::Mat(target_height, target_width, CV_8UC3, cv::Scalar(0, 0, 0));
         cv::Point offset;
 
-        if (frame.empty())
+        // Scale calibration for display - use the centralized utility method
+        DartboardCalibration displayCalib = dartboard_visualization::scaleCalibrationForDisplay(
+            tempCalib, colorFrame, target_width, target_height, offset);
+
+        // Resize the frame and place it on the background
+        cv::Mat properlyResized;
+        int targetWidth = target_width - 2 * offset.x;
+        int targetHeight = target_height - 2 * offset.y;
+        cv::resize(colorFrame, properlyResized, cv::Size(targetWidth, targetHeight));
+        cv::Mat roi = debugVis(cv::Rect(offset.x, offset.y, targetWidth, targetHeight));
+        properlyResized.copyTo(roi);
+
+        // Use the centralized renderer
+        dartboard_visualization::drawCalibrationOverlay(debugVis, displayCalib, true);
+
+        // Add camera identifier
+        cv::rectangle(debugVis, cv::Point(target_width - 160, 10), cv::Point(target_width - 10, 40),
+                      cv::Scalar(0, 0, 0), -1);
+        cv::putText(debugVis, "Camera " + to_string(camera_idx + 1) + " Overlay",
+                    cv::Point(target_width - 150, 30), cv::FONT_HERSHEY_SIMPLEX, 0.6,
+                    cv::Scalar(0, 255, 255), 1);
+
+        // Save debug image
+        string dir = "debug_frames/circles";
+        system(("mkdir -p " + dir).c_str());
+        cv::imwrite(dir + "/camera" + to_string(camera_idx + 1) + "_overlay.jpg", debugVis);
+    }
+
+    // Final coordinates with more detailed logging
+    cout << "DEBUG-FIND: Final center for camera " << camera_idx + 1 << "=("
+         << center.x << "," << center.y << "), radius=" << radius
+         << ", offset from frame center=("
+         << (center.x - frame.cols / 2) << "," << (center.y - frame.rows / 2) << ")" << endl;
+
+    return true;
+}
+
+// SIMPLIFIED: Calibrate dartboard - just detect circle and use fixed orientation
+bool GeometryDetector::calibrateDartboard(const vector<cv::Mat> &frames)
+{
+    calibrations.clear();
+    cout << "\n===== DARTBOARD CALIBRATION STARTED =====\n";
+
+    if (frames.empty())
+    {
+        cerr << "No frames provided for calibration" << endl;
+        return false;
+    }
+
+    for (size_t cam_idx = 0; cam_idx < frames.size(); cam_idx++)
+    {
+        cout << "Calibrating camera " << cam_idx + 1 << "..." << endl;
+
+        if (frames[cam_idx].empty())
         {
-            // Use placeholder for missing frames
-            resized = cv::Mat(target_height, target_width, CV_8UC3, cv::Scalar(30, 30, 30));
-            cv::putText(resized, "Camera disconnected", cv::Point(180, 240),
-                        cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(0, 0, 255), 2);
-            offset = cv::Point(0, 0); // No offset for placeholders
+            cerr << "Empty frame from camera " << cam_idx + 1 << endl;
+            continue;
+        }
+
+        // CHANGED: Skip preprocessing - use the original color frame directly
+        // This preserves color information for finding red/green rings
+        cv::Point center;
+        double radius;
+        bool found = findDartboardCircle(frames[cam_idx], center, radius, cam_idx);
+
+        // Debug logging for calibration
+        cout << "DEBUG-CALIB: Processing camera " << cam_idx + 1 << endl;
+
+        // CHANGED: Lower minimum radius threshold from 40 to 25 to accommodate smaller dartboards
+        if (found && radius > 25) // Was: radius > 40
+        {
+            // Always use fixed orientation - standard dartboard
+            DartboardCalibration calib;
+            calib.center = center;
+            calib.radius = radius;
+            calib.orientation = 270.0;    // Fixed - segment 20 at top
+            calib.camera_index = cam_idx; // CRITICAL: This stores the actual camera index
+
+            // Set standard ring proportions
+            calib.bullRadius = radius * 0.07;
+            calib.doubleRingInner = radius * 0.92;
+            calib.doubleRingOuter = radius;
+            calib.tripleRingInner = radius * 0.55;
+            calib.tripleRingOuter = radius * 0.63;
+
+            // Log before adding to calibrations
+            cout << "DEBUG-CALIB: Storing camera " << cam_idx + 1
+                 << " center=(" << center.x << "," << center.y << ")" << endl;
+
+            calibrations.push_back(calib);
+            cout << "Camera " << cam_idx + 1 << " calibrated: center=("
+                 << center.x << "," << center.y << "), radius=" << radius << endl;
         }
         else
         {
-            // Create black background image of standard size
-            resized = cv::Mat(target_height, target_width, CV_8UC3, cv::Scalar(0, 0, 0));
-
-            // Calculate aspect-ratio preserving dimensions and place the frame
-            int targetWidth = target_width;
-            int targetHeight = static_cast<int>(targetWidth / (frame.cols / (double)frame.rows));
-
-            if (targetHeight > target_height)
-            {
-                targetHeight = target_height;
-                targetWidth = static_cast<int>(targetHeight * (frame.cols / (double)frame.rows));
-            }
-
-            offset.x = (target_width - targetWidth) / 2;
-            offset.y = (target_height - targetHeight) / 2;
-
-            // Resize the actual frame
-            cv::Mat properlyResized;
-            cv::resize(frame, properlyResized, cv::Size(targetWidth, targetHeight));
-
-            // Create ROI and copy the resized frame
-            cv::Mat roi = resized(cv::Rect(offset.x, offset.y, targetWidth, targetHeight));
-            properlyResized.copyTo(roi);
+            cout << "Failed to calibrate camera " << cam_idx + 1 << endl;
         }
-
-        resized_frames.push_back(resized);
-        offsets.push_back(offset);
-        max_width = std::max(max_width, resized.cols);
-        total_height += resized.rows;
     }
 
-    // Create combined image
-    cv::Mat combined = cv::Mat::zeros(total_height, max_width, CV_8UC3);
-    int y_offset = 0;
-
-    std::cout << "DEBUG-MULTIVIEW: Creating combined camera view" << std::endl;
-
-    // Add title to the multi-view image
-    cv::putText(combined, "Dartboard Multi-Camera View",
-                cv::Point(10, 25), cv::FONT_HERSHEY_SIMPLEX,
-                0.8, cv::Scalar(255, 255, 255), 2);
-
-    // Add each camera view
-    for (size_t i = 0; i < resized_frames.size(); i++)
+    // Before saving multi-camera view, log all calibrations
+    if (!calibrations.empty())
     {
-        // Get region for this camera
-        cv::Mat region = combined(cv::Rect(0, y_offset,
-                                           resized_frames[i].cols,
-                                           resized_frames[i].rows));
-
-        // Copy frame
-        resized_frames[i].copyTo(region);
-
-        // Draw calibration overlay if available for this camera
-        bool found_calibration = false;
-        for (size_t calib_idx = 0; calib_idx < calibrations.size(); calib_idx++)
+        cout << "DEBUG-CALIB: Final calibration summary:" << endl;
+        for (size_t i = 0; i < calibrations.size(); i++)
         {
-            // Use the stored camera_index to find the right calibration
-            if (calibrations[calib_idx].camera_index == i && !frames[i].empty())
-            {
-                // Use our utility method to get correctly scaled calibration
-                cv::Point unused_offset; // We already have the offset
-                DartboardCalibration displayCalib = scaleCalibrationForDisplay(
-                    calibrations[calib_idx],
-                    frames[i],
-                    target_width,
-                    target_height,
-                    unused_offset);
-
-                // Apply the stored offset
-                displayCalib.center.x = (displayCalib.center.x - unused_offset.x) + offsets[i].x;
-                displayCalib.center.y = (displayCalib.center.y - unused_offset.y) + offsets[i].y;
-
-                std::cout << "DEBUG-MULTIVIEW: Drawing camera " << i + 1
-                          << " center=(" << displayCalib.center.x << ","
-                          << displayCalib.center.y << "), offset ("
-                          << offsets[i].x << "," << offsets[i].y << ")" << std::endl;
-
-                // Use the adjusted calibration for drawing
-                drawDartboardCalibration(region, displayCalib, true);
-                found_calibration = true;
-                break;
-            }
+            cout << "DEBUG-CALIB:   Camera " << i + 1
+                 << " center=(" << calibrations[i].center.x << "," << calibrations[i].center.y
+                 << "), radius=" << calibrations[i].radius << endl;
         }
-
-        // If no calibration found for this camera, just add the camera label
-        if (!found_calibration)
-        {
-            std::cout << "DEBUG-MULTIVIEW: No calibration for camera " << i + 1 << std::endl;
-        }
-
-        y_offset += region.rows;
     }
 
-    // Save the debug view
-    std::string dir = "debug_frames";
-    system(("mkdir -p " + dir).c_str());
-    cv::imwrite(dir + "/dartboard_view.jpg", combined);
-}
+    // Show multi-camera view with calibration overlay
+    if (debug_mode && !calibrations.empty())
+    {
+        // Use the centralized visualization function instead
+        dartboard_visualization::saveMultiCameraDebugView(
+            frames,
+            calibrations,
+            {}, // No detections during calibration
+            target_width,
+            target_height,
+            false); // Not using competition mode for debugging
+    }
 
-// Utility for measuring point distances
-double GeometryDetector::distanceToPoint(const cv::Point &p1, const cv::Point &p2)
-{
-    return std::sqrt(std::pow(p1.x - p2.x, 2) + std::pow(p1.y - p2.y, 2));
+    cout << "===== DARTBOARD CALIBRATION COMPLETED =====\n";
+    return !calibrations.empty();
 }
