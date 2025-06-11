@@ -4,7 +4,7 @@
 export PKG_VERSION=0.11.0
 export PKG_NAME=opendartboard
 WIDTH=${WIDTH:-640}
-HEIGHT=${HEIGHT:-480}
+HEIGHT=${HEIGHT:-360}
 FPS=${FPS:-15}
 
 # output config and build info
