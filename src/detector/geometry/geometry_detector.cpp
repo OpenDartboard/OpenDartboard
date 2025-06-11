@@ -229,7 +229,7 @@ cv::Mat GeometryDetector::preprocessFrame(const cv::Mat &frame, bool preserveCol
 
 // IMPROVED: More robust color-based dartboard detection that starts from the center
 // IMPROVED: More robust color-based dartboard detection that starts from the center
-bool GeometryDetector::findDartboardCircle(const cv::Mat &frame, cv::Point &center, double &radius, int camera_idx)
+bool GeometryDetector::findDartboardCircle(const cv::Mat &frame, cv::Point &center, double &radius, double &orientation, int camera_idx)
 {
     // Enhanced logging for better debugging
     cout << "DEBUG-FIND: Starting circle detection for camera " << camera_idx + 1
@@ -466,51 +466,15 @@ bool GeometryDetector::findDartboardCircle(const cv::Mat &frame, cv::Point &cent
     // STEP 6: Create debug visualization
     if (debug_mode)
     {
+        DartboardCalibration tempCalib = createCalibration(center, radius, orientation, camera_idx);
 
-        // Create a temporary calibration object for visualization
-        DartboardCalibration tempCalib;
-        tempCalib.center = center;
-        tempCalib.radius = radius;
-        tempCalib.orientation = 270.0; // Fixed - segment 20 at top
-        tempCalib.camera_index = camera_idx;
-
-        // Set standard ring proportions
-        tempCalib.bullRadius = radius * 0.07;
-        tempCalib.doubleRingInner = radius * 0.92;
-        tempCalib.doubleRingOuter = radius;
-        tempCalib.tripleRingInner = radius * 0.55;
-        tempCalib.tripleRingOuter = radius * 0.63;
-
-        // Create debug view and scale calibration using shared utility method
-        cv::Mat debugVis = cv::Mat(target_height, target_width, CV_8UC3, cv::Scalar(0, 0, 0));
-        cv::Point offset;
-
-        // Scale calibration for display - use the centralized utility method
-        DartboardCalibration displayCalib = dartboard_visualization::scaleCalibrationForDisplay(
-            tempCalib, colorFrame, target_width, target_height, offset);
-
-        // Resize the frame and place it on the background
-        cv::Mat properlyResized;
-        int targetWidth = target_width - 2 * offset.x;
-        int targetHeight = target_height - 2 * offset.y;
-        cv::resize(colorFrame, properlyResized, cv::Size(targetWidth, targetHeight));
-        cv::Mat roi = debugVis(cv::Rect(offset.x, offset.y, targetWidth, targetHeight));
-        properlyResized.copyTo(roi);
-
-        // Use the centralized renderer
-        dartboard_visualization::drawCalibrationOverlay(debugVis, displayCalib, true);
-
-        // Add camera identifier
-        cv::rectangle(debugVis, cv::Point(target_width - 160, 10), cv::Point(target_width - 10, 40),
-                      cv::Scalar(0, 0, 0), -1);
-        cv::putText(debugVis, "Camera " + to_string(camera_idx + 1) + " Overlay",
-                    cv::Point(target_width - 150, 30), cv::FONT_HERSHEY_SIMPLEX, 0.6,
-                    cv::Scalar(0, 255, 255), 1);
-
-        // Save debug image
+        // Use the centralized utility method for debug visualization
         string dir = "debug_frames/circles";
         system(("mkdir -p " + dir).c_str());
-        cv::imwrite(dir + "/camera" + to_string(camera_idx + 1) + "_overlay.jpg", debugVis);
+        string outputPath = dir + "/camera" + to_string(camera_idx + 1) + "_overlay.jpg";
+        dartboard_visualization::saveSingleCameraDebugView(
+            colorFrame, tempCalib, outputPath, target_width, target_height,
+            "Camera " + to_string(camera_idx + 1) + " Overlay");
     }
 
     // Final coordinates with more detailed logging
@@ -520,6 +484,25 @@ bool GeometryDetector::findDartboardCircle(const cv::Mat &frame, cv::Point &cent
          << (center.x - frame.cols / 2) << "," << (center.y - frame.rows / 2) << ")" << endl;
 
     return true;
+}
+
+// Add this helper function to create standard calibration
+DartboardCalibration GeometryDetector::createCalibration(cv::Point center, double radius, double orientation, int cameraIdx)
+{
+    DartboardCalibration calib;
+    calib.center = center;
+    calib.radius = radius;
+    calib.orientation = orientation; // Use the provided orientation
+    calib.camera_index = cameraIdx;
+
+    // Set standard ring proportions
+    calib.bullRadius = radius * 0.07;
+    calib.doubleRingInner = radius * 0.92;
+    calib.doubleRingOuter = radius;
+    calib.tripleRingInner = radius * 0.55;
+    calib.tripleRingOuter = radius * 0.63;
+
+    return calib;
 }
 
 // SIMPLIFIED: Calibrate dartboard - just detect circle and use fixed orientation
@@ -548,7 +531,8 @@ bool GeometryDetector::calibrateDartboard(const vector<cv::Mat> &frames)
         // This preserves color information for finding red/green rings
         cv::Point center;
         double radius;
-        bool found = findDartboardCircle(frames[cam_idx], center, radius, cam_idx);
+        double orientation; // Add orientation parameter
+        bool found = findDartboardCircle(frames[cam_idx], center, radius, orientation, cam_idx);
 
         // Debug logging for calibration
         cout << "DEBUG-CALIB: Processing camera " << cam_idx + 1 << endl;
@@ -556,19 +540,8 @@ bool GeometryDetector::calibrateDartboard(const vector<cv::Mat> &frames)
         // CHANGED: Lower minimum radius threshold from 40 to 25 to accommodate smaller dartboards
         if (found && radius > 25) // Was: radius > 40
         {
-            // Always use fixed orientation - standard dartboard
-            DartboardCalibration calib;
-            calib.center = center;
-            calib.radius = radius;
-            calib.orientation = 270.0;    // Fixed - segment 20 at top
-            calib.camera_index = cam_idx; // CRITICAL: This stores the actual camera index
-
-            // Set standard ring proportions
-            calib.bullRadius = radius * 0.07;
-            calib.doubleRingInner = radius * 0.92;
-            calib.doubleRingOuter = radius;
-            calib.tripleRingInner = radius * 0.55;
-            calib.tripleRingOuter = radius * 0.63;
+            // Use helper function to create calibration with detected orientation
+            DartboardCalibration calib = createCalibration(center, radius, orientation, cam_idx);
 
             // Log before adding to calibrations
             cout << "DEBUG-CALIB: Storing camera " << cam_idx + 1

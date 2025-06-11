@@ -246,6 +246,7 @@ namespace dartboard_visualization
         scaledCalib.radius *= scaleFactor;
 
         // Update all ring proportions
+        // After scaling the radius, we can derive the other ring sizes
         scaledCalib.bullRadius = scaledCalib.radius * 0.07;
         scaledCalib.doubleRingInner = scaledCalib.radius * 0.92;
         scaledCalib.doubleRingOuter = scaledCalib.radius;
@@ -401,5 +402,44 @@ namespace dartboard_visualization
     }
 
     // Function to save a single camera debug view
+    inline void saveSingleCameraDebugView(
+        const cv::Mat &frame,
+        const DartboardCalibration &calibration,
+        const std::string &outputPath,
+        int targetWidth,
+        int targetHeight,
+        const std::string &label = "")
+    {
+        // Create debug view and scale calibration
+        cv::Mat debugVis = cv::Mat(targetHeight, targetWidth, CV_8UC3, cv::Scalar(0, 0, 0));
+        cv::Point offset;
 
-}
+        // Scale calibration for display - reuse existing function
+        DartboardCalibration displayCalib = scaleCalibrationForDisplay(
+            calibration, frame, targetWidth, targetHeight, offset);
+
+        // Resize the frame and place it on the background
+        cv::Mat properlyResized;
+        int resizedWidth = targetWidth - 2 * offset.x;
+        int resizedHeight = targetHeight - 2 * offset.y;
+        cv::resize(frame, properlyResized, cv::Size(resizedWidth, resizedHeight));
+        cv::Mat roi = debugVis(cv::Rect(offset.x, offset.y, resizedWidth, resizedHeight));
+        properlyResized.copyTo(roi);
+
+        // Draw calibration overlay using existing function
+        drawCalibrationOverlay(debugVis, displayCalib, true);
+
+        // Add camera identifier if label is provided
+        if (!label.empty())
+        {
+            cv::rectangle(debugVis, cv::Point(targetWidth - 160, 10),
+                          cv::Point(targetWidth - 10, 40), cv::Scalar(0, 0, 0), -1);
+            cv::putText(debugVis, label, cv::Point(targetWidth - 150, 30),
+                        cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 255, 255), 1);
+        }
+
+        // Save debug image
+        cv::imwrite(outputPath, debugVis);
+    }
+
+} // end namespace
