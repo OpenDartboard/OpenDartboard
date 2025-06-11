@@ -4,13 +4,18 @@
 #include <thread>
 #include <mutex>
 #include <atomic>
+#include <opencv2/opencv.hpp>
+#include "detector/dart_detector.hpp"
 
 using namespace std;
 
 class Scorer
 {
 public:
-  Scorer(const std::string &model, int width, int height, int fps, const std::vector<std::string> &cams);
+  // Added use_ai parameter to match implementation in cpp file
+  Scorer(const std::string &model, int width, int height, int fps,
+         const std::vector<std::string> &cams, bool debug_mode = false,
+         bool use_ai = false);
   ~Scorer();
 
   // Start the scoring process and don't return until stopped
@@ -30,6 +35,14 @@ private:
   // Simulates dart detection and returns a detected score (or empty string if nothing detected)
   string detect_score();
 
+  // Camera capture related
+  vector<cv::VideoCapture> cameras;
+  bool initializeCameras();
+  vector<cv::Mat> captureFrames();
+
+  // Image preprocessing methods
+  std::vector<cv::Mat> preprocessFrames(const std::vector<cv::Mat> &frames);
+
   // Thread and synchronization
   thread vision_thread;
   atomic<bool> running{false};
@@ -43,4 +56,26 @@ private:
   string model_path;
   int width, height, fps;
   vector<string> camera_sources;
+  bool debug_display; // Debug mode flag for saving frames
+
+  // Helper to check if a path is a video file
+  bool isVideoFile(const string &path);
+
+  // Motion detection
+  std::vector<cv::Mat> previous_frames;
+  bool detectMotion(const std::vector<cv::Mat> &current_frames);
+
+  // State tracking for dart detection
+  enum class DetectionState
+  {
+    WAITING_FOR_THROW,
+    MOTION_DETECTED,
+    DART_DETECTED
+  };
+  DetectionState detection_state = DetectionState::WAITING_FOR_THROW;
+  std::chrono::steady_clock::time_point last_motion_time;
+
+  // Detector - using the common interface
+  std::unique_ptr<DartDetector> detector;
+  bool use_ai_detector = false;
 };
