@@ -23,7 +23,6 @@ class GeometryDetector : public DartDetector
 public:
     // Updated constructor to accept target resolution
     GeometryDetector(bool debug_mode = false, int target_width = 640, int target_height = 480);
-    ~GeometryDetector() override;
 
     bool initialize(const std::string &config_path) override;
     bool initialize(const std::string &config_path, const std::vector<cv::Mat> &initial_frames);
@@ -51,22 +50,7 @@ private:
     void saveMultiCameraDebugView(const std::vector<cv::Mat> &frames,
                                   const std::vector<DartDetection> &detections);
 
-    // Utility functions
-    double distanceToPoint(const cv::Point &p1, const cv::Point &p2);
-    double colorDifference(const cv::Vec3b &color1, const cv::Vec3b &color2);
-    std::vector<cv::Vec3b> extractColorProfile(const cv::Mat &frame,
-                                               const cv::Point &center,
-                                               double radius,
-                                               int samples = 72);
-
-    // NEW: Utility for scaling calibration for visualization
-    DartboardCalibration scaleCalibrationForDisplay(
-        const DartboardCalibration &calib,
-        const cv::Mat &originalFrame,
-        int targetWidth, int targetHeight,
-        cv::Point &outOffset);
-
-    // Interface with renderer
+    // Interface with renderer - keep these simplified wrappers
     void drawDartboardCalibration(cv::Mat &frame, const DartboardCalibration &calib,
                                   bool detailed = false);
     std::string determineScore(const cv::Point &dartPosition, const DartboardCalibration &calib);
