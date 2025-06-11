@@ -1,0 +1,151 @@
+#include "yolo_detector.hpp"
+#include <iostream>
+#include <algorithm>
+// Update the include path for ncnn
+#include <ncnn/layer.h>
+
+// Define class names (for dart detection, we might only have one class)
+const std::vector<std::string> class_names = {"dart"};
+
+YOLODetector::YOLODetector(const std::string &param_path,
+                           const std::string &bin_path,
+                           float conf_threshold,
+                           float nms_threshold)
+    : confidence_threshold(conf_threshold),
+      nms_threshold(nms_threshold),
+      input_width(640),  // Standard YOLOv8 input size
+      input_height(640), // Standard YOLOv8 input size
+      model_loaded(false)
+{
+    try
+    {
+        // Load model
+        net.load_param(param_path.c_str());
+        net.load_model(bin_path.c_str());
+        model_loaded = true;
+        std::cout << "YOLOv8 model loaded successfully" << std::endl;
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "Failed to load YOLO model: " << e.what() << std::endl;
+    }
+}
+
+YOLODetector::~YOLODetector()
+{
+    // Clean up will be handled by ncnn::Net destructor
+}
+
+std::vector<Detection> YOLODetector::detect(const cv::Mat &image)
+{
+    if (!model_loaded)
+    {
+        std::cerr << "Model not loaded!" << std::endl;
+        return {};
+    }
+
+    // Create ncnn extractor
+    ncnn::Extractor ex = net.create_extractor();
+
+    // Prepare input
+    ncnn::Mat input;
+    preprocess(image, input);
+
+    // Set input
+    ex.input("images", input);
+
+    // Get output
+    ncnn::Mat output;
+    ex.extract("output0", output);
+
+    // Process output to get detections
+    return postprocess(output, image.size());
+}
+
+void YOLODetector::preprocess(const cv::Mat &image, ncnn::Mat &in)
+{
+    // Resize image to model's input dimensions
+    cv::Mat resized;
+    cv::resize(image, resized, cv::Size(input_width, input_height));
+
+    // Convert to RGB (YOLO models are trained on RGB)
+    cv::Mat rgb;
+    if (image.channels() == 3)
+    {
+        cv::cvtColor(resized, rgb, cv::COLOR_BGR2RGB);
+    }
+    else
+    {
+        cv::cvtColor(resized, rgb, cv::COLOR_GRAY2RGB);
+    }
+
+    // Convert to ncnn::Mat (YOLO expects normalized pixel values 0-1)
+    in = ncnn::Mat::from_pixels(rgb.data, ncnn::Mat::PIXEL_RGB, input_width, input_height);
+
+    // Normalize pixel values
+    const float mean_vals[3] = {0.f, 0.f, 0.f};
+    const float norm_vals[3] = {1 / 255.f, 1 / 255.f, 1 / 255.f};
+    in.substract_mean_normalize(mean_vals, norm_vals);
+}
+
+std::vector<Detection> YOLODetector::postprocess(ncnn::Mat &out, const cv::Size &original_size)
+{
+    std::vector<Detection> detections;
+
+    // YOLOv8 output format (Simplified for example):
+    // - For each box: [x, y, w, h, conf, class_scores...]
+
+    // Get dimensions and scaling factors
+    float scale_x = float(original_size.width) / input_width;
+    float scale_y = float(original_size.height) / input_height;
+
+    // Parse output
+    for (int i = 0; i < out.h; i++)
+    {
+        const float *values = out.row(i);
+
+        // Get confidence
+        float confidence = values[4];
+        if (confidence < confidence_threshold)
+        {
+            continue;
+        }
+
+        // Get class scores
+        int class_id = 0;
+        float max_score = values[5];
+        for (int j = 1; j < class_names.size(); j++)
+        {
+            if (values[5 + j] > max_score)
+            {
+                max_score = values[5 + j];
+                class_id = j;
+            }
+        }
+
+        // Create detection
+        Detection det;
+        det.confidence = confidence;
+        det.class_id = class_id;
+        det.class_name = class_names[class_id];
+
+        // Get bounding box
+        float x = values[0];
+        float y = values[1];
+        float w = values[2];
+        float h = values[3];
+
+        // Scale to original image size
+        det.bbox.x = x * scale_x;
+        det.bbox.y = y * scale_y;
+        det.bbox.width = w * scale_x;
+        det.bbox.height = h * scale_y;
+
+        detections.push_back(det);
+    }
+
+    // Apply non-maximum suppression
+    // We'll implement this later since our dart detection is simpler
+
+    return detections;
+}
