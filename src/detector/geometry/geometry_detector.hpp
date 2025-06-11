@@ -44,8 +44,11 @@ private:
     bool calibrateDartboard(const std::vector<cv::Mat> &frames);
     std::vector<DartDetection> findDarts(const cv::Mat &frame, const cv::Mat &background);
 
+    // Helper to create standardized calibration objects
+    DartboardCalibration createCalibration(cv::Point center, double radius, double orientation, int cameraIdx);
+
     // Helpers
-    bool findDartboardCircle(const cv::Mat &frame, cv::Point &center, double &radius, int camera_idx = 0);
+    bool findDartboardCircle(const cv::Mat &frame, cv::Point &center, double &radius, double &orientation, int camera_idx = 0);
     cv::Mat preprocessFrame(const cv::Mat &frame, bool preserveColor = false);
     void saveMultiCameraDebugView(const std::vector<cv::Mat> &frames,
                                   const std::vector<DartDetection> &detections);
