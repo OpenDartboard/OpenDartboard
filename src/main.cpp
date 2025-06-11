@@ -25,15 +25,19 @@ int main(int argc, char **argv)
   string model_path = getArg(argc, argv, "--model", "/usr/local/share/opendartboard/models/dart.param");
   vector<string> cams = getArgVector(argc, argv, "--cams", "/dev/video0,/dev/video1,/dev/video2");
   int width = getArg(argc, argv, "--width", 640);
-  int height = getArg(argc, argv, "--height", 480);
+  int height = getArg(argc, argv, "--height", 360);
   int fps = getArg(argc, argv, "--fps", 15);
+  bool debug_mode = hasFlag(argc, argv, "--debug") || hasFlag(argc, argv, "-d");
+
+  // Add command-line flag to choose detector
+  bool use_ai_detector = hasFlag(argc, argv, "--use-ai");
 
   // Print startup and configuration information
   debug::printStartup("OpenDartboard", version);
   debug::printConfig(width, height, fps, model_path, cams);
 
-  // Initialise the scorer
-  Scorer scorer(model_path, width, height, fps, cams);
+  // Initialise the scorer with debug mode if requested
+  Scorer scorer(model_path, width, height, fps, cams, debug_mode, use_ai_detector);
 
   // Register signal handlers with a lambda to stop the scorer
   signals::setupSignalHandlers([&scorer]()
