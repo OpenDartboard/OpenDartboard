@@ -323,39 +323,52 @@ bool GeometryDetector::findDartboardCircle(const cv::Mat &frame, cv::Point &cent
     cv::Mat hsvFrame;
     cv::cvtColor(colorFrame, hsvFrame, cv::COLOR_BGR2HSV);
 
-    // Create masks for red and green with BROADER RANGES to handle different lighting
-    cv::Mat redMask1, redMask2, redMask, greenMask;
+    // UNIVERSAL approach - use wider ranges that work for ALL cameras
+    cv::Mat redMask1, redMask2, redMask, greenMask, whiteMask;
 
-    // IMPROVED: Red mask with broader ranges (both low and high H ranges for red)
-    // This helps with cameras 2 and 3 that might have different lighting
-    cv::inRange(hsvFrame, cv::Scalar(0, 50, 50), cv::Scalar(15, 255, 255), redMask1);    // Broader red low range
-    cv::inRange(hsvFrame, cv::Scalar(160, 50, 50), cv::Scalar(180, 255, 255), redMask2); // Broader red high range
+    // Broad red detection that works universally (both primary and wrapped hue ranges)
+    cv::inRange(hsvFrame, cv::Scalar(0, 40, 40), cv::Scalar(20, 255, 255), redMask1);
+    cv::inRange(hsvFrame, cv::Scalar(160, 40, 40), cv::Scalar(180, 255, 255), redMask2);
+
+    // Detect whitish areas for lighting variations
+    cv::inRange(hsvFrame, cv::Scalar(0, 0, 150), cv::Scalar(180, 40, 255), whiteMask);
+
+    // Green detection for triple ring with adaptive range
+    cv::inRange(hsvFrame, cv::Scalar(30, 40, 40), cv::Scalar(90, 255, 255), greenMask);
+
+    // Combine masks intelligently
     redMask = redMask1 | redMask2;
-
-    // IMPROVED: Green mask with broader range for triple ring
-    cv::inRange(hsvFrame, cv::Scalar(30, 40, 40), cv::Scalar(90, 255, 255), greenMask); // More inclusive green
-
-    // Create a red/green only mask
     cv::Mat redGreenMask = redMask | greenMask;
-    cv::Mat redGreenOnly = cv::Mat::zeros(frame.size(), CV_8UC3);
 
-    // Fill red and green pixels
+    // Add white areas if red/green detection is poor
+    int colorCount = cv::countNonZero(redGreenMask);
+    if (colorCount < (frame.rows * frame.cols * 0.05))
+    { // If less than 5% detected
+        redGreenMask = redGreenMask | whiteMask;
+    }
+
+    // Create visualization image
+    cv::Mat redGreenOnly = cv::Mat::zeros(frame.size(), CV_8UC3);
     for (int y = 0; y < redGreenMask.rows; y++)
     {
         for (int x = 0; x < redGreenMask.cols; x++)
         {
             if (redMask.at<uchar>(y, x) > 0)
             {
-                redGreenOnly.at<cv::Vec3b>(y, x) = cv::Vec3b(0, 0, 255); // Pure red
+                redGreenOnly.at<cv::Vec3b>(y, x) = cv::Vec3b(0, 0, 255); // Red
             }
             else if (greenMask.at<uchar>(y, x) > 0)
             {
-                redGreenOnly.at<cv::Vec3b>(y, x) = cv::Vec3b(0, 255, 0); // Pure green
+                redGreenOnly.at<cv::Vec3b>(y, x) = cv::Vec3b(0, 255, 0); // Green
+            }
+            else if (whiteMask.at<uchar>(y, x) > 0 && redGreenMask.at<uchar>(y, x) > 0)
+            {
+                redGreenOnly.at<cv::Vec3b>(y, x) = cv::Vec3b(200, 200, 200); // Light gray
             }
         }
     }
 
-    // Save the red/green only image
+    // Save debug images
     if (debug_mode)
     {
         system("mkdir -p debug_frames");
@@ -363,24 +376,31 @@ bool GeometryDetector::findDartboardCircle(const cv::Mat &frame, cv::Point &cent
         cv::imwrite("debug_frames/red_green_mask_" + std::to_string(camera_idx) + ".jpg", redGreenMask);
     }
 
-    //---------- STEP 2: ENHANCE MASK FOR BETTER DETECTION ----------
+    //---------- STEP 2: ADAPTIVE MASK ENHANCEMENT ----------
 
-    // IMPROVED: Better morphological operations to clean noise while preserving structure
-    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(5, 5));
-    cv::morphologyEx(redGreenMask, redGreenMask, cv::MORPH_CLOSE, kernel);
+    // Detect feature density to determine appropriate processing
+    double featureDensity = cv::countNonZero(redGreenMask) / static_cast<double>(frame.total());
 
-    // NEW: Create a cleaner version specifically for finding circles
+    // Choose kernel size based on feature density - larger for sparse features
+    int kernelSize = (featureDensity < 0.05) ? 7 : 5;
+    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(kernelSize, kernelSize));
+
+    // Apply more aggressive morphology for sparse features
+    int iterations = (featureDensity < 0.05) ? 2 : 1;
+    cv::morphologyEx(redGreenMask, redGreenMask, cv::MORPH_CLOSE, kernel, cv::Point(-1, -1), iterations);
+
+    // Create cleaner mask for circle detection
     cv::Mat circleMask = redGreenMask.clone();
     cv::morphologyEx(circleMask, circleMask, cv::MORPH_OPEN,
                      cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3, 3)));
     cv::morphologyEx(circleMask, circleMask, cv::MORPH_CLOSE,
                      cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(9, 9)));
 
-    // Find contours in the processed mask
+    // Find contours
     std::vector<std::vector<cv::Point>> contours;
     cv::findContours(redGreenMask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
 
-    // Draw contours on debug image
+    // Debug visualization
     if (debug_mode)
     {
         cv::Mat contourVis = colorFrame.clone();
@@ -391,63 +411,72 @@ bool GeometryDetector::findDartboardCircle(const cv::Mat &frame, cv::Point &cent
     //---------- STEP 3: MULTI-STRATEGY DETECTION ----------
 
     cv::Point frameCenter(frame.cols / 2, frame.rows / 2);
-    cv::Point bestCenter = frameCenter; // Default to frame center
+    cv::Point bestCenter = frameCenter;
     double bestScore = 0;
-    double bestRadius = std::min(frame.cols, frame.rows) / 3.0; // Default radius
+    double bestRadius = std::min(frame.cols, frame.rows) / 3.0;
 
-    // Strategy A: Find the bull's eye directly (highest priority)
-    cv::Mat bullsEye;
-    cv::bitwise_and(redMask, redMask, bullsEye);
-
-    // IMPROVED: Enhanced bull detection with morphology
+    // Strategy A: Bull's eye detection
+    cv::Mat bullsEye = redMask.clone();
     cv::morphologyEx(bullsEye, bullsEye, cv::MORPH_CLOSE,
                      cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3, 3)));
 
     std::vector<std::vector<cv::Point>> bullContours;
     cv::findContours(bullsEye, bullContours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
 
-    // Look for circular red blobs near center with improved scoring
+    // Process bull contours
     for (const auto &contour : bullContours)
     {
         double area = cv::contourArea(contour);
-        if (area < 20 || area > 1500) // Expanded upper limit for distant cameras
+        // Adaptive size filtering based on image size
+        double minArea = 20;
+        double maxArea = frame.total() * 0.005; // 0.5% of image max
+
+        if (area < minArea || area > maxArea)
             continue;
 
         // Calculate circularity
         double perimeter = cv::arcLength(contour, true);
         double circularity = (4 * CV_PI * area) / (perimeter * perimeter);
-        if (circularity < 0.5) // Slightly more tolerant
+        if (circularity < 0.5)
             continue;
 
         cv::Point2f center2f;
         float radius2f;
         cv::minEnclosingCircle(contour, center2f, radius2f);
 
-        // IMPROVED: Better scoring with wider search area and weighting
+        // Adaptive scoring based on distance from frame center
+        double maxDist = cv::norm(cv::Point(0, 0) - cv::Point(frame.cols, frame.rows)) / 2.0;
         double distToCenter = cv::norm(cv::Point(center2f) - frameCenter);
-        double centralityScore = 1.0 - (distToCenter / (frame.cols / 1.5)); // Expanded search area
+        double centralityScore = 1.0 - (distToCenter / maxDist);
+
+        // Combined score weighted by circularity and centrality
         double score = circularity * 0.6 + centralityScore * 0.4;
 
         if (score > bestScore)
         {
             bestScore = score;
             bestCenter = cv::Point(center2f);
-            bestRadius = radius2f * 35; // Bull radius to board radius
+            bestRadius = radius2f * 35; // Estimated board radius from bull
         }
     }
 
-    // Strategy B: Look for circular patterns in board rings
+    // Strategy B: Circular pattern detection with adaptive parameters
     if (bestScore < 0.5)
-    { // More tolerance for trying other methods
-        // IMPROVED: Better Hough parameters for different camera perspectives
-        std::vector<cv::Vec3f> circles;
-        cv::HoughCircles(circleMask, circles, cv::HOUGH_GRADIENT, 1.2,
-                         circleMask.rows / 8, 80, 25, // More adaptive thresholds
-                         circleMask.rows / 10, circleMask.rows / 1.5);
+    {
+        // Adjust parameters based on feature density
+        double dp = (featureDensity < 0.05) ? 1.0 : 1.2;
+        int minDist = circleMask.rows / ((featureDensity < 0.05) ? 10 : 8);
+        int cannyThreshold = (featureDensity < 0.05) ? 70 : 80;
+        int accThreshold = (featureDensity < 0.05) ? 20 : 25;
 
+        std::vector<cv::Vec3f> circles;
+        cv::HoughCircles(circleMask, circles, cv::HOUGH_GRADIENT, dp, minDist,
+                         cannyThreshold, accThreshold,
+                         circleMask.rows / 12, circleMask.rows / 1.5);
+
+        // Process detected circles
         if (!circles.empty())
         {
-            // Find best circle based on combined metrics
             double bestCircleScore = 0;
             int bestIdx = -1;
 
@@ -456,19 +485,29 @@ bool GeometryDetector::findDartboardCircle(const cv::Mat &frame, cv::Point &cent
                 cv::Point circleCenter(cvRound(circles[i][0]), cvRound(circles[i][1]));
                 float circleRadius = circles[i][2];
 
-                // Center proximity plus consideration of expected size
-                double distToCenter = cv::norm(circleCenter - frameCenter);
-                double centralityScore = 1.0 - (distToCenter / (frame.cols / 1.5));
+                // Adaptive ROI size based on image dimensions
+                int roiSize = std::max(5, std::min(20, frame.cols / 30));
 
-                // Check if there's red in the center (likely bull)
-                cv::Mat centerROI = redMask(cv::Rect(
-                    std::max(0, circleCenter.x - 10),
-                    std::max(0, circleCenter.y - 10),
-                    std::min(20, redMask.cols - circleCenter.x + 10),
-                    std::min(20, redMask.rows - circleCenter.y + 10)));
+                // Check for red content near center (potential bull)
+                cv::Rect roi(
+                    std::max(0, circleCenter.x - roiSize),
+                    std::max(0, circleCenter.y - roiSize),
+                    std::min(2 * roiSize, redMask.cols - circleCenter.x + roiSize),
+                    std::min(2 * roiSize, redMask.rows - circleCenter.y + roiSize));
+
+                // Avoid invalid ROIs
+                if (roi.width <= 0 || roi.height <= 0)
+                    continue;
+
+                cv::Mat centerROI = redMask(roi);
                 double centerRedness = cv::countNonZero(centerROI) / static_cast<double>(centerROI.total());
 
-                // Combined score with emphasis on center redness
+                // Adaptive centrality measure
+                double maxDist = cv::norm(cv::Point(0, 0) - cv::Point(frame.cols, frame.rows)) / 2.0;
+                double distToCenter = cv::norm(circleCenter - frameCenter);
+                double centralityScore = 1.0 - (distToCenter / maxDist);
+
+                // Balance between center proximity and redness
                 double circleScore = centralityScore * 0.4 + centerRedness * 0.6;
 
                 if (circleScore > bestCircleScore)
@@ -478,6 +517,7 @@ bool GeometryDetector::findDartboardCircle(const cv::Mat &frame, cv::Point &cent
                 }
             }
 
+            // Update best detection if circle score is good
             if (bestIdx >= 0 && bestCircleScore > bestScore)
             {
                 bestCenter = cv::Point(cvRound(circles[bestIdx][0]), cvRound(circles[bestIdx][1]));
@@ -487,13 +527,12 @@ bool GeometryDetector::findDartboardCircle(const cv::Mat &frame, cv::Point &cent
         }
     }
 
-    // Strategy C: NEW - Use color density analysis for cameras with poor contrast
+    // Strategy C: Color density map (universally applicable)
     if (bestScore < 0.4)
     {
-        // Create a distance-weighted color density map
         cv::Mat densityMap = cv::Mat::zeros(frame.size(), CV_32F);
 
-        // Weight pixels based on red/green presence and distance from frame center
+        // Create density map with exponential distance weighting
         for (int y = 0; y < redGreenMask.rows; y++)
         {
             for (int x = 0; x < redGreenMask.cols; x++)
@@ -507,25 +546,29 @@ bool GeometryDetector::findDartboardCircle(const cv::Mat &frame, cv::Point &cent
             }
         }
 
-        // Blur the density map to find the highest weighted region
-        cv::GaussianBlur(densityMap, densityMap, cv::Size(21, 21), 0);
+        // Apply adaptive blur based on feature density
+        int blurSize = (featureDensity < 0.05) ? 31 : 21;
+        cv::GaussianBlur(densityMap, densityMap, cv::Size(blurSize, blurSize), 0);
 
-        // Find the maximum weighted point
+        // Find density peak
         cv::Point maxLoc;
         double maxVal;
         cv::minMaxLoc(densityMap, nullptr, &maxVal, nullptr, &maxLoc);
 
         if (maxVal > 0)
         {
-            double densityScore = 0.3 + (maxVal / 20.0); // Normalize score
+            // Normalized density score
+            double densityScore = 0.3 + (maxVal / 20.0);
 
             if (densityScore > bestScore)
             {
                 bestCenter = maxLoc;
-                // Estimate radius from color distribution
+
+                // Calculate radius from feature distribution
                 cv::Mat nonZeroCoordinates;
                 cv::findNonZero(redGreenMask, nonZeroCoordinates);
 
+                // Compute average distance to colored pixels
                 double sumDist = 0;
                 int count = 0;
                 for (int i = 0; i < nonZeroCoordinates.total(); i++)
@@ -533,15 +576,14 @@ bool GeometryDetector::findDartboardCircle(const cv::Mat &frame, cv::Point &cent
                     cv::Point pt = nonZeroCoordinates.at<cv::Point>(i);
                     double dist = cv::norm(pt - bestCenter);
                     if (dist < frame.cols / 2)
-                    { // Only consider points within reasonable range
+                    {
                         sumDist += dist;
                         count++;
                     }
                 }
 
-                // Calculate average distance as radius approximation
-                double avgRadius = (count > 0) ? (sumDist / count) : (frame.cols / 5.0);
-                bestRadius = avgRadius * 1.2; // Slightly increase for better coverage
+                // Calculate radius with safety check
+                bestRadius = (count > 0) ? (sumDist / count) * 1.2 : (frame.cols / 5.0);
                 bestScore = densityScore;
             }
         }
