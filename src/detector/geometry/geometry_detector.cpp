@@ -227,284 +227,6 @@ cv::Mat GeometryDetector::preprocessFrame(const cv::Mat &frame, bool preserveCol
     return gray;
 }
 
-// IMPROVED: More robust color-based dartboard detection that starts from the center
-// IMPROVED: More robust color-based dartboard detection that starts from the center
-bool GeometryDetector::findDartboardCircle(const cv::Mat &frame, cv::Point &center, double &radius, double &orientation, int camera_idx)
-{
-    // Enhanced logging for better debugging
-    cout << "DEBUG-FIND: Starting circle detection for camera " << camera_idx + 1
-         << " (" << frame.cols << "x" << frame.rows << ")" << endl;
-
-    // We need a color image for this approach
-    if (frame.empty())
-        return false;
-
-    // Must be a color image
-    cv::Mat colorFrame;
-    if (frame.channels() == 3)
-        colorFrame = frame.clone();
-    else
-    {
-        cv::cvtColor(frame, colorFrame, cv::COLOR_GRAY2BGR);
-        cerr << "Warning: Using grayscale image for color-based detection" << endl;
-    }
-
-    // Create debug visualization
-    cv::Mat debugVis;
-    if (debug_mode)
-        debugVis = colorFrame.clone();
-
-    // STEP 1: Use Hough Circles as an initial detector (more reliable than color-based)
-    cv::Mat grayFrame;
-    cv::cvtColor(colorFrame, grayFrame, cv::COLOR_BGR2GRAY);
-    cv::GaussianBlur(grayFrame, grayFrame, cv::Size(9, 9), 2, 2);
-
-    std::vector<cv::Vec3f> circles;
-    // Parameters optimized for dartboard detection
-    cv::HoughCircles(grayFrame, circles, cv::HOUGH_GRADIENT, 1,
-                     grayFrame.rows / 4,  // Minimum distance between circles
-                     100, 30,             // Canny/accumulator thresholds
-                     grayFrame.rows / 8,  // Min radius - don't detect tiny circles
-                     grayFrame.rows / 2); // Max radius - don't go too large
-
-    cv::Point houghCenter;
-    double houghRadius = 0;
-    bool foundHough = false;
-
-    if (!circles.empty())
-    {
-        // Sort circles by size (prefer larger ones as they're more likely the dartboard)
-        std::sort(circles.begin(), circles.end(),
-                  [](const cv::Vec3f &a, const cv::Vec3f &b)
-                  { return a[2] > b[2]; });
-
-        // Use the largest circle that's not too big
-        for (const auto &circle : circles)
-        {
-            float x = circle[0];
-            float y = circle[1];
-            float r = circle[2];
-
-            // Accept if circle is centered-ish in the frame
-            cv::Point frameCenter(frame.cols / 2, frame.rows / 2);
-            double centerDist = cv::norm(cv::Point(x, y) - frameCenter);
-            if (centerDist < frame.cols / 3)
-            {
-                houghCenter = cv::Point(x, y);
-                houghRadius = r;
-                foundHough = true;
-                break;
-            }
-        }
-    }
-
-    // Use Hough circle if found, otherwise fall back to frame center
-    cv::Point frameCenter(frame.cols / 2, frame.rows / 2);
-    cv::Point searchCenter = foundHough ? houghCenter : frameCenter;
-
-    if (debug_mode && foundHough)
-    {
-        cv::circle(debugVis, houghCenter, houghRadius, cv::Scalar(255, 0, 255), 2);
-        cv::putText(debugVis, "Hough", houghCenter - cv::Point(20, 20),
-                    cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255, 0, 255), 2);
-    }
-
-    // STEP 2: Define search area around detected circle or frame center
-    int searchRadius = foundHough ? houghRadius * 1.5 : min(frame.cols, frame.rows) * 0.4;
-    cv::Rect centerRegion(
-        max(0, searchCenter.x - searchRadius),
-        max(0, searchCenter.y - searchRadius),
-        min(frame.cols - 1, searchRadius * 2),
-        min(frame.rows - 1, searchRadius * 2));
-
-    // Convert to HSV for better color segmentation
-    cv::Mat hsvFrame;
-    cv::cvtColor(colorFrame, hsvFrame, cv::COLOR_BGR2HSV);
-
-    // STEP 3: Create improved color masks with more precise thresholds
-    cv::Mat redMask1, redMask2, redMask, greenMask;
-
-    // Red comes in two ranges in HSV space (more permissive ranges to catch varying lighting)
-    cv::inRange(hsvFrame, cv::Scalar(0, 70, 50), cv::Scalar(10, 255, 255), redMask1);
-    cv::inRange(hsvFrame, cv::Scalar(170, 70, 50), cv::Scalar(180, 255, 255), redMask2);
-    redMask = redMask1 | redMask2;
-
-    // Green ring detection (more permissive range)
-    cv::inRange(hsvFrame, cv::Scalar(30, 30, 30), cv::Scalar(90, 255, 255), greenMask);
-
-    // Combined color mask
-    cv::Mat colorMask = redMask | greenMask;
-
-    // Apply morphology to clean noise
-    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3, 3));
-    cv::morphologyEx(colorMask, colorMask, cv::MORPH_OPEN, kernel);
-    cv::morphologyEx(colorMask, colorMask, cv::MORPH_CLOSE, kernel);
-
-    // STEP 4: Find bull's eye (red circle)
-    cv::Mat bullMask = redMask.clone();
-    // Apply distance transform to emphasize center points
-    cv::Mat distTransform;
-    cv::distanceTransform(bullMask, distTransform, cv::DIST_L2, 3);
-
-    // Normalize and threshold to find peaks
-    cv::normalize(distTransform, distTransform, 0, 1.0, cv::NORM_MINMAX);
-    cv::Mat bullPeaks;
-    cv::threshold(distTransform, bullPeaks, 0.5, 1.0, cv::THRESH_BINARY);
-
-    // Convert to 8-bit for findContours
-    bullPeaks.convertTo(bullPeaks, CV_8U, 255);
-
-    vector<vector<cv::Point>> bullContours;
-    cv::findContours(bullPeaks, bullContours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
-
-    cv::Point bullCenter(-1, -1);
-    double bullRadius = 0;
-    double bestBullScore = 0;
-
-    // First check if we already have a center from Hough circles
-    if (foundHough)
-    {
-        bullCenter = houghCenter;
-        // Estimate bullseye radius as 7% of dartboard radius
-        bullRadius = houghRadius * 0.07;
-        bestBullScore = 1.0;
-    }
-    else
-    {
-        // Fall back to contour analysis
-        for (const auto &contour : bullContours)
-        {
-            double area = cv::contourArea(contour);
-            if (area < 10)
-                continue;
-
-            cv::Point2f center;
-            float radius;
-            cv::minEnclosingCircle(contour, center, radius);
-
-            // Score based on circularity and proximity to search center
-            double circularity = area / (CV_PI * radius * radius);
-            double centerDistance = cv::norm(cv::Point2f(searchCenter) - center);
-            double centralityScore = 1.0 - (centerDistance / (searchRadius * 1.0));
-            double score = circularity * 0.6 + centralityScore * 0.4;
-
-            if (score > bestBullScore && radius < searchRadius * 0.2)
-            {
-                bestBullScore = score;
-                bullCenter = cv::Point(center.x, center.y);
-                bullRadius = radius;
-            }
-        }
-    }
-
-    // If we found a bullseye, use it; otherwise use Hough center or fall back to frame center
-    if (bullCenter.x > 0 && bestBullScore > 0.3)
-    {
-        center = bullCenter;
-    }
-    else if (foundHough)
-    {
-        center = houghCenter;
-    }
-    else
-    {
-        center = frameCenter;
-    }
-
-    // STEP 5: Determine dartboard radius using circular Hough transform data or edge analysis
-    if (foundHough)
-    {
-        radius = houghRadius;
-    }
-    else
-    {
-        // Use edge detection to find radius from detected center
-        cv::Mat edges;
-        cv::Canny(grayFrame, edges, 50, 150);
-
-        // Analyze edges radiating from center to find outer circle
-        const int NUM_RAYS = 36;
-        std::vector<double> edgeDistances;
-
-        for (int i = 0; i < NUM_RAYS; i++)
-        {
-            double angle = i * (2 * CV_PI / NUM_RAYS);
-            double maxDist = min(frame.cols, frame.rows) * 0.45; // Maximum search distance
-
-            for (double r = 20; r < maxDist; r += 0.5)
-            {
-                int x = center.x + r * cos(angle);
-                int y = center.y + r * sin(angle);
-
-                if (x < 0 || y < 0 || x >= edges.cols || y >= edges.rows)
-                    break;
-
-                if (edges.at<uchar>(y, x) > 0)
-                {
-                    edgeDistances.push_back(r);
-                    break;
-                }
-            }
-        }
-
-        // Use median distance to avoid outliers
-        if (!edgeDistances.empty())
-        {
-            std::sort(edgeDistances.begin(), edgeDistances.end());
-            radius = edgeDistances[edgeDistances.size() / 2]; // Median value
-        }
-        else
-        {
-            // Fallback if edge detection fails
-            radius = min(frame.cols, frame.rows) / 3.0;
-        }
-    }
-
-    // Ensure minimum radius
-    radius = max(radius, 25.0);
-
-    // STEP 6: Create debug visualization
-    if (debug_mode)
-    {
-        DartboardCalibration tempCalib = createCalibration(center, radius, orientation, camera_idx);
-
-        // Use the centralized utility method for debug visualization
-        string dir = "debug_frames/circles";
-        system(("mkdir -p " + dir).c_str());
-        string outputPath = dir + "/camera" + to_string(camera_idx + 1) + "_overlay.jpg";
-        dartboard_visualization::saveSingleCameraDebugView(
-            colorFrame, tempCalib, outputPath, target_width, target_height,
-            "Camera " + to_string(camera_idx + 1) + " Overlay");
-    }
-
-    // Final coordinates with more detailed logging
-    cout << "DEBUG-FIND: Final center for camera " << camera_idx + 1 << "=("
-         << center.x << "," << center.y << "), radius=" << radius
-         << ", offset from frame center=("
-         << (center.x - frame.cols / 2) << "," << (center.y - frame.rows / 2) << ")" << endl;
-
-    return true;
-}
-
-// Add this helper function to create standard calibration
-DartboardCalibration GeometryDetector::createCalibration(cv::Point center, double radius, double orientation, int cameraIdx)
-{
-    DartboardCalibration calib;
-    calib.center = center;
-    calib.radius = radius;
-    calib.orientation = orientation; // Use the provided orientation
-    calib.camera_index = cameraIdx;
-
-    // Set standard ring proportions
-    calib.bullRadius = radius * 0.07;
-    calib.doubleRingInner = radius * 0.92;
-    calib.doubleRingOuter = radius;
-    calib.tripleRingInner = radius * 0.55;
-    calib.tripleRingOuter = radius * 0.63;
-
-    return calib;
-}
-
 // SIMPLIFIED: Calibrate dartboard - just detect circle and use fixed orientation
 bool GeometryDetector::calibrateDartboard(const vector<cv::Mat> &frames)
 {
@@ -584,4 +306,204 @@ bool GeometryDetector::calibrateDartboard(const vector<cv::Mat> &frames)
 
     cout << "===== DARTBOARD CALIBRATION COMPLETED =====\n";
     return !calibrations.empty();
+}
+
+// Simplified Color-Based Dartboard Detection
+bool GeometryDetector::findDartboardCircle(const cv::Mat &frame, cv::Point &center, double &radius, double &orientation, int camera_idx)
+{
+    // Basic validation
+    if (frame.empty() || frame.channels() < 3)
+        return false;
+
+    cv::Mat colorFrame = frame.clone();
+
+    //---------- STEP 1: CREATE RED AND GREEN ONLY MASK ----------
+
+    // Convert to HSV for better color separation
+    cv::Mat hsvFrame;
+    cv::cvtColor(colorFrame, hsvFrame, cv::COLOR_BGR2HSV);
+
+    // Create masks for red and green (the key dartboard colors)
+    cv::Mat redMask1, redMask2, redMask, greenMask;
+
+    // Red mask (both low and high H ranges for red)
+    cv::inRange(hsvFrame, cv::Scalar(0, 70, 70), cv::Scalar(10, 255, 255), redMask1);
+    cv::inRange(hsvFrame, cv::Scalar(170, 70, 70), cv::Scalar(180, 255, 255), redMask2);
+    redMask = redMask1 | redMask2;
+
+    // Green mask (for triple ring)
+    cv::inRange(hsvFrame, cv::Scalar(35, 50, 50), cv::Scalar(85, 255, 255), greenMask);
+
+    // Create a red/green only image - exactly what you asked for
+    cv::Mat redGreenMask = redMask | greenMask;
+    cv::Mat redGreenOnly = cv::Mat::zeros(frame.size(), CV_8UC3);
+
+    // Fill red pixels
+    colorFrame.copyTo(redGreenOnly, redMask);
+
+    // Fill green pixels
+    for (int y = 0; y < greenMask.rows; y++)
+    {
+        for (int x = 0; x < greenMask.cols; x++)
+        {
+            if (greenMask.at<uchar>(y, x) > 0)
+            {
+                redGreenOnly.at<cv::Vec3b>(y, x) = cv::Vec3b(0, 255, 0); // Pure green
+            }
+        }
+    }
+
+    // Save the red/green only image
+    if (debug_mode)
+    {
+        system("mkdir -p debug_frames");
+        cv::imwrite("debug_frames/red_green_only_" + std::to_string(camera_idx) + ".jpg", redGreenOnly);
+        cv::imwrite("debug_frames/red_green_mask_" + std::to_string(camera_idx) + ".jpg", redGreenMask);
+    }
+
+    //---------- STEP 2: FIND CONTOURS IN THE RED/GREEN MASK ----------
+
+    // Clean mask for better contour detection
+    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(5, 5));
+    cv::morphologyEx(redGreenMask, redGreenMask, cv::MORPH_CLOSE, kernel);
+
+    std::vector<std::vector<cv::Point>> contours;
+    cv::findContours(redGreenMask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+
+    // Draw contours on debug image
+    if (debug_mode)
+    {
+        cv::Mat contourVis = colorFrame.clone();
+        cv::drawContours(contourVis, contours, -1, cv::Scalar(0, 255, 255), 2);
+        cv::imwrite("debug_frames/contours_" + std::to_string(camera_idx) + ".jpg", contourVis);
+    }
+
+    //---------- STEP 3: FIND RED/GREEN NEAR CENTER ----------
+
+    cv::Point frameCenter(frame.cols / 2, frame.rows / 2);
+    cv::Point bestCenter = frameCenter; // Default to frame center
+    double bestScore = 0;
+    double bestRadius = std::min(frame.cols, frame.rows) / 3.0; // Default radius
+
+    // A. First try to find red bull's eye near center (highest priority)
+    cv::Mat bullsEye;
+    cv::bitwise_and(redMask, redMask, bullsEye); // Just the red mask
+
+    // Find red contours (potential bull's eye)
+    std::vector<std::vector<cv::Point>> bullContours;
+    cv::findContours(bullsEye, bullContours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+
+    // Look for circular red blobs near center
+    for (const auto &contour : bullContours)
+    {
+        double area = cv::contourArea(contour);
+        if (area < 20 || area > 1000)
+            continue;
+
+        // Calculate circularity
+        double perimeter = cv::arcLength(contour, true);
+        double circularity = (4 * CV_PI * area) / (perimeter * perimeter);
+        if (circularity < 0.6)
+            continue; // Must be reasonably circular
+
+        cv::Point2f center2f;
+        float radius2f;
+        cv::minEnclosingCircle(contour, center2f, radius2f);
+
+        // Score based on:
+        // 1. Proximity to center (higher weight)
+        // 2. Circularity
+        double distToCenter = cv::norm(cv::Point(center2f) - frameCenter);
+        double centralityScore = 1.0 - (distToCenter / (frame.cols / 2.0));
+        double score = centralityScore * 0.7 + circularity * 0.3;
+
+        if (score > bestScore)
+        {
+            bestScore = score;
+            bestCenter = cv::Point(center2f);
+            bestRadius = radius2f * 35; // Bull radius to board radius
+        }
+    }
+
+    // B. If no good bull found, try to find circular patterns in the combined mask
+    if (bestScore < 0.4)
+    {
+        // Apply Hough circle detection to the combined mask
+        std::vector<cv::Vec3f> circles;
+        cv::HoughCircles(redGreenMask, circles, cv::HOUGH_GRADIENT, 1.5,
+                         redGreenMask.rows / 8, 100, 30,
+                         redGreenMask.rows / 8, redGreenMask.rows / 2);
+
+        if (!circles.empty())
+        {
+            // Find circle closest to center
+            double bestDist = frame.cols;
+            int bestIdx = -1;
+
+            for (size_t i = 0; i < circles.size(); i++)
+            {
+                cv::Point circleCenter(cvRound(circles[i][0]), cvRound(circles[i][1]));
+                double dist = cv::norm(circleCenter - frameCenter);
+                if (dist < bestDist)
+                {
+                    bestDist = dist;
+                    bestIdx = i;
+                }
+            }
+
+            if (bestIdx >= 0)
+            {
+                bestCenter = cv::Point(cvRound(circles[bestIdx][0]), cvRound(circles[bestIdx][1]));
+                bestRadius = circles[bestIdx][2];
+                bestScore = 0.6; // Consider this a reasonable detection
+            }
+        }
+    }
+
+    // Use the best center we found
+    center = bestCenter;
+    radius = bestRadius;
+    orientation = 270.0; // Standard orientation
+
+    // Final debug visualization
+    if (debug_mode)
+    {
+        cv::Mat finalVis = colorFrame.clone();
+        // Draw center and radius
+        cv::circle(finalVis, center, 5, cv::Scalar(0, 0, 255), -1);
+        cv::circle(finalVis, center, radius, cv::Scalar(0, 255, 255), 2);
+
+        // Draw frame center for reference
+        cv::circle(finalVis, frameCenter, 5, cv::Scalar(255, 0, 0), -1);
+
+        // Add score info
+        cv::putText(finalVis, "Score: " + std::to_string(bestScore).substr(0, 4),
+                    cv::Point(20, 30), cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(0, 255, 0), 2);
+
+        cv::imwrite("debug_frames/final_detection_" + std::to_string(camera_idx) + ".jpg", finalVis);
+    }
+
+    std::cout << "Camera " << camera_idx + 1 << ": Center=(" << center.x << "," << center.y
+              << "), radius=" << radius << ", confidence=" << bestScore << std::endl;
+
+    return true;
+}
+
+// Add this helper function to create standard calibration
+DartboardCalibration GeometryDetector::createCalibration(cv::Point center, double radius, double orientation, int cameraIdx)
+{
+    DartboardCalibration calib;
+    calib.center = center;
+    calib.radius = radius;
+    calib.orientation = orientation; // Use the provided orientation
+    calib.camera_index = cameraIdx;
+
+    // Set standard ring proportions
+    calib.bullRadius = radius * 0.07;
+    calib.doubleRingInner = radius * 0.92;
+    calib.doubleRingOuter = radius;
+    calib.tripleRingInner = radius * 0.55;
+    calib.tripleRingOuter = radius * 0.63;
+
+    return calib;
 }
