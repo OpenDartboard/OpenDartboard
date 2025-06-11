@@ -400,4 +400,6 @@ namespace dartboard_visualization
         cv::imwrite(dir + "/dartboard_view.jpg", combined);
     }
 
+    // Function to save a single camera debug view
+
 }
