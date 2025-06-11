@@ -5,7 +5,7 @@ FROM arm64v8/debian:bullseye
 # FROM debian:bullseye 
 
 ENV WIDTH=640 \
-  HEIGHT=480 \
+  HEIGHT=360 \
   FPS=15 \
   DEBIAN_FRONTEND=noninteractive
 
