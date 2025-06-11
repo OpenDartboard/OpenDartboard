@@ -58,6 +58,14 @@
     "chrono": "cpp",
     "compare": "cpp",
     "algorithm": "cpp",
-    "csignal": "cpp"
+    "csignal": "cpp",
+    "condition_variable": "cpp",
+    "deque": "cpp",
+    "queue": "cpp",
+    "complex": "cpp",
+    "sstream": "cpp",
+    "__nullptr": "cpp",
+    "__string": "cpp",
+    "concepts": "cpp"
   }
 }
