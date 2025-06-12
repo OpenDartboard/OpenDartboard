@@ -316,12 +316,23 @@ bool GeometryDetector::findDartboardCircle(const cv::Mat &frame, cv::Point &cent
         return false;
 
     cv::Mat colorFrame = frame.clone();
+    cv::Point frameCenter(frame.cols / 2, frame.rows / 2);
+
+    // OPTIMIZATION: Create circular ROI mask centered on frame - MOVED TO BEGINNING
+    cv::Mat roiMask = cv::Mat::zeros(frame.size(), CV_8UC1);
+    // Start with a generous ROI covering most of the image but excluding corners
+    int initialRoiRadius = std::min(frame.cols, frame.rows) / 2.0;
+    cv::circle(roiMask, frameCenter, initialRoiRadius, cv::Scalar(255), -1);
+
+    // Create ROI-constrained color frame for all subsequent processing
+    cv::Mat roiColorFrame;
+    colorFrame.copyTo(roiColorFrame, roiMask);
 
     //---------- STEP 1: CREATE RED AND GREEN ONLY MASK ----------
 
-    // Convert to HSV for better color separation
+    // Convert to HSV for better color separation - ONLY PROCESS WITHIN ROI
     cv::Mat hsvFrame;
-    cv::cvtColor(colorFrame, hsvFrame, cv::COLOR_BGR2HSV);
+    cv::cvtColor(roiColorFrame, hsvFrame, cv::COLOR_BGR2HSV);
 
     // UNIVERSAL approach - use wider ranges that work for ALL cameras
     cv::Mat redMask1, redMask2, redMask, greenMask, whiteMask;
@@ -347,7 +358,7 @@ bool GeometryDetector::findDartboardCircle(const cv::Mat &frame, cv::Point &cent
         redGreenMask = redGreenMask | whiteMask;
     }
 
-    // Create visualization image
+    // Create visualization with ROI applied
     cv::Mat redGreenOnly = cv::Mat::zeros(frame.size(), CV_8UC3);
     for (int y = 0; y < redGreenMask.rows; y++)
     {
@@ -379,7 +390,8 @@ bool GeometryDetector::findDartboardCircle(const cv::Mat &frame, cv::Point &cent
     //---------- STEP 2: ADAPTIVE MASK ENHANCEMENT ----------
 
     // Detect feature density to determine appropriate processing
-    double featureDensity = cv::countNonZero(redGreenMask) / static_cast<double>(frame.total());
+    // Using ROI-masked versions for all calculations
+    double featureDensity = cv::countNonZero(redGreenMask) / static_cast<double>(cv::countNonZero(roiMask));
 
     // Choose kernel size based on feature density - larger for sparse features
     int kernelSize = (featureDensity < 0.05) ? 7 : 5;
@@ -396,21 +408,35 @@ bool GeometryDetector::findDartboardCircle(const cv::Mat &frame, cv::Point &cent
     cv::morphologyEx(circleMask, circleMask, cv::MORPH_CLOSE,
                      cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(9, 9)));
 
-    // Find contours
-    std::vector<std::vector<cv::Point>> contours;
-    cv::findContours(redGreenMask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+    // IMPROVED: Create enhanced contour mask to detect circular features better
+    cv::Mat contourMask = redGreenMask.clone();
 
-    // Debug visualization
+    // Simple ring enhancement - first dilate slightly to connect broken ring segments
+    cv::dilate(redGreenMask, contourMask, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3, 3)));
+
+    // Then extract edges only - this will highlight the rings
+    cv::Mat ringEdges;
+    cv::Laplacian(contourMask, ringEdges, CV_8U, 3);
+    cv::threshold(ringEdges, ringEdges, 10, 255, cv::THRESH_BINARY);
+
+    // Combine original mask with edges to preserve all features while enhancing rings
+    contourMask = contourMask | ringEdges;
+
+    // Find contours using the enhanced mask within ROI
+    std::vector<std::vector<cv::Point>> contours;
+    cv::findContours(contourMask, contours, cv::RETR_LIST, cv::CHAIN_APPROX_NONE);
+
+    // Debug visualization with NO NEW images - use existing contours_*.jpg
     if (debug_mode)
     {
         cv::Mat contourVis = colorFrame.clone();
-        cv::drawContours(contourVis, contours, -1, cv::Scalar(0, 255, 255), 2);
+        // IMPROVED: Make contours much bolder (thickness 3 instead of 1)
+        cv::drawContours(contourVis, contours, -1, cv::Scalar(0, 255, 255), 3);
         cv::imwrite("debug_frames/contours_" + std::to_string(camera_idx) + ".jpg", contourVis);
     }
 
     //---------- STEP 3: MULTI-STRATEGY DETECTION ----------
 
-    cv::Point frameCenter(frame.cols / 2, frame.rows / 2);
     cv::Point bestCenter = frameCenter;
     double bestScore = 0;
     double bestRadius = std::min(frame.cols, frame.rows) / 3.0;
@@ -597,7 +623,9 @@ bool GeometryDetector::findDartboardCircle(const cv::Mat &frame, cv::Point &cent
     // Final debug visualization
     if (debug_mode)
     {
+        // Draw circular ROI on final visualization
         cv::Mat finalVis = colorFrame.clone();
+        cv::circle(finalVis, frameCenter, initialRoiRadius, cv::Scalar(70, 70, 70), 1);
 
         // Draw frame center reference
         cv::circle(finalVis, frameCenter, 5, cv::Scalar(255, 0, 0), -1);
