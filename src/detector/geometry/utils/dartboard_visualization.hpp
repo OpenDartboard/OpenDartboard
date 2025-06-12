@@ -33,18 +33,29 @@ namespace dartboard_visualization
         cv::circle(frame, calib.center, 3, cv::Scalar(0, 0, 0), -1);    // Black center
         cv::circle(frame, calib.center, 5, cv::Scalar(0, 255, 255), 2); // Yellow outline
 
-        // Draw outer boundary
-        cv::circle(frame, calib.center, calib.radius, cv::Scalar(255, 255, 255), 2);
+        // Always draw as ellipses
+        // Create rotated rect for each ring
+        cv::RotatedRect outerRing(calib.center, calib.axes, calib.angle);
 
-        // Draw rings with distinctive colors
-        cv::circle(frame, calib.center, calib.doubleRingInner, cv::Scalar(0, 0, 255), 2); // Red
-        cv::circle(frame, calib.center, calib.doubleRingOuter, cv::Scalar(0, 0, 255), 2); // Red
-        cv::circle(frame, calib.center, calib.tripleRingInner, cv::Scalar(0, 255, 0), 2); // Green
-        cv::circle(frame, calib.center, calib.tripleRingOuter, cv::Scalar(0, 255, 0), 2); // Green
+        // Scale for inner rings based on standard proportions
+        cv::Size2f doubleRingSize(calib.axes.width * 0.92, calib.axes.height * 0.92);
+        cv::RotatedRect doubleRingInner(calib.center, doubleRingSize, calib.angle);
+
+        cv::Size2f tripleOuterSize(calib.axes.width * 0.63, calib.axes.height * 0.63);
+        cv::RotatedRect tripleRingOuter(calib.center, tripleOuterSize, calib.angle);
+
+        cv::Size2f tripleInnerSize(calib.axes.width * 0.55, calib.axes.height * 0.55);
+        cv::RotatedRect tripleRingInner(calib.center, tripleInnerSize, calib.angle);
+
+        // Draw rings as ellipses
+        cv::ellipse(frame, outerRing, cv::Scalar(255, 255, 255), 2);
+        cv::ellipse(frame, doubleRingInner, cv::Scalar(0, 0, 255), 2);
+        cv::ellipse(frame, tripleRingOuter, cv::Scalar(0, 255, 0), 2);
+        cv::ellipse(frame, tripleRingInner, cv::Scalar(0, 255, 0), 2);
 
         // Draw bull
-        cv::circle(frame, calib.center, calib.bullRadius, cv::Scalar(0, 255, 255), 2);    // Yellow
-        cv::circle(frame, calib.center, calib.bullRadius / 2, cv::Scalar(255, 0, 0), -1); // Red center
+        cv::circle(frame, calib.center, calib.bullRadius, cv::Scalar(0, 0, 200), 2);
+        cv::circle(frame, calib.center, calib.bullRadius / 2, cv::Scalar(0, 0, 200), -1);
 
         // CHANGED: Use the orientation from calibration instead of hardcoding to 270
         double orientationRad = calib.orientation * CV_PI / 180.0;
@@ -182,28 +193,55 @@ namespace dartboard_visualization
         if (frame.empty() || calib.radius <= 0)
             return;
 
-        // Draw clean rings without debugging info
-        // Draw outer boundary with thick white border
-        cv::circle(frame, calib.center, calib.radius, cv::Scalar(255, 255, 255), 2);
+        // Draw clean rings using elliptical parameters for better accuracy
+        // Create rotated rect for each ring
+        cv::RotatedRect outerRing(calib.center, calib.axes, calib.angle);
 
-        // Draw double/triple rings with vivid competition colors
-        cv::circle(frame, calib.center, calib.doubleRingInner, cv::Scalar(0, 0, 200), 2);
-        cv::circle(frame, calib.center, calib.tripleRingInner, cv::Scalar(0, 200, 0), 2);
-        cv::circle(frame, calib.center, calib.tripleRingOuter, cv::Scalar(0, 200, 0), 2);
+        // Scale for inner rings based on standard proportions
+        cv::Size2f doubleRingSize(calib.axes.width * 0.92, calib.axes.height * 0.92);
+        cv::RotatedRect doubleRingInner(calib.center, doubleRingSize, calib.angle);
+
+        cv::Size2f tripleOuterSize(calib.axes.width * 0.63, calib.axes.height * 0.63);
+        cv::RotatedRect tripleRingOuter(calib.center, tripleOuterSize, calib.angle);
+
+        cv::Size2f tripleInnerSize(calib.axes.width * 0.55, calib.axes.height * 0.55);
+        cv::RotatedRect tripleRingInner(calib.center, tripleInnerSize, calib.angle);
+
+        // Draw rings as ellipses
+        cv::ellipse(frame, outerRing, cv::Scalar(255, 255, 255), 2);
+        cv::ellipse(frame, doubleRingInner, cv::Scalar(0, 0, 200), 2);
+        cv::ellipse(frame, tripleRingOuter, cv::Scalar(0, 200, 0), 2);
+        cv::ellipse(frame, tripleRingInner, cv::Scalar(0, 200, 0), 2);
 
         // Draw bull with clean red/green colors
         cv::circle(frame, calib.center, calib.bullRadius, cv::Scalar(0, 0, 200), 2);
         cv::circle(frame, calib.center, calib.bullRadius / 2, cv::Scalar(0, 0, 200), -1);
 
         // Add segment dividers (20 segments) with clean lines
-        // CHANGED: Use the orientation from calibration instead of hardcoding to 270
         double orientationRad = calib.orientation * CV_PI / 180.0;
         for (int i = 0; i < 20; i++)
         {
             double segmentAngle = orientationRad + i * (2.0 * CV_PI / 20.0);
-            cv::Point lineEnd(
-                calib.center.x + calib.radius * cos(segmentAngle),
-                calib.center.y + calib.radius * sin(segmentAngle));
+
+            // Calculate end points on ellipse boundary using parametric equation
+            double a = calib.axes.width / 2;  // semi-major axis
+            double b = calib.axes.height / 2; // semi-minor axis
+
+            // Rotate angle by the ellipse angle to account for ellipse rotation
+            double rotatedAngle = segmentAngle - (calib.angle * CV_PI / 180.0);
+
+            // Parametric equation of ellipse
+            double x = a * cos(rotatedAngle);
+            double y = b * sin(rotatedAngle);
+
+            // Rotate back to original coordinate system
+            double cosAngle = cos(calib.angle * CV_PI / 180.0);
+            double sinAngle = sin(calib.angle * CV_PI / 180.0);
+            double xRot = x * cosAngle - y * sinAngle;
+            double yRot = x * sinAngle + y * cosAngle;
+
+            // Create end point and draw line
+            cv::Point lineEnd(calib.center.x + xRot, calib.center.y + yRot);
             cv::line(frame, calib.center, lineEnd, cv::Scalar(255, 255, 255), 1);
         }
     }
@@ -245,6 +283,10 @@ namespace dartboard_visualization
         // Use the smaller scale factor to avoid oval shapes
         double scaleFactor = std::min(scaleX, scaleY);
         scaledCalib.radius *= scaleFactor;
+
+        // IMPORTANT: Scale the elliptical parameters too
+        scaledCalib.axes.width *= scaleFactor;
+        scaledCalib.axes.height *= scaleFactor;
 
         // Update all ring proportions
         // After scaling the radius, we can derive the other ring sizes
