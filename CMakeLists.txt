@@ -35,7 +35,8 @@ add_executable(opendartboard
     src/scorer/scorer.cpp
     # src/detector/ai/yolo_detector.cpp
     src/detector/geometry/geometry_detector.cpp
-    src/detector/geometry/geometry_dartboard.cpp  
+    src/detector/geometry/geometry_dartboard.cpp
+    src/detector/geometry/geometry_calibration.cpp 
 )
 
 target_include_directories(opendartboard PRIVATE
