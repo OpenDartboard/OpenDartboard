@@ -46,8 +46,8 @@ namespace dartboard_visualization
         cv::circle(frame, calib.center, calib.bullRadius, cv::Scalar(0, 255, 255), 2);    // Yellow
         cv::circle(frame, calib.center, calib.bullRadius / 2, cv::Scalar(255, 0, 0), -1); // Red center
 
-        // ALWAYS USE 270 DEGREES FOR SEGMENT 20 (top) - FIXED ORIENTATION
-        double orientationRad = 270.0 * CV_PI / 180.0;
+        // CHANGED: Use the orientation from calibration instead of hardcoding to 270
+        double orientationRad = calib.orientation * CV_PI / 180.0;
 
         // Calculate segment 20 position (top)
         cv::Point segment20(
@@ -196,7 +196,8 @@ namespace dartboard_visualization
         cv::circle(frame, calib.center, calib.bullRadius / 2, cv::Scalar(0, 0, 200), -1);
 
         // Add segment dividers (20 segments) with clean lines
-        double orientationRad = 270.0 * CV_PI / 180.0;
+        // CHANGED: Use the orientation from calibration instead of hardcoding to 270
+        double orientationRad = calib.orientation * CV_PI / 180.0;
         for (int i = 0; i < 20; i++)
         {
             double segmentAngle = orientationRad + i * (2.0 * CV_PI / 20.0);
@@ -322,8 +323,6 @@ namespace dartboard_visualization
         cv::Mat combined = cv::Mat::zeros(total_height, max_width, CV_8UC3);
         int y_offset = 0;
 
-        std::cout << "DEBUG-MULTIVIEW: Creating combined camera view" << std::endl;
-
         // Add title to the multi-view image
         cv::putText(combined, competition_style ? "Dartboard Game View" : "Dartboard Multi-Camera View",
                     cv::Point(10, 25), cv::FONT_HERSHEY_SIMPLEX,
@@ -360,11 +359,14 @@ namespace dartboard_visualization
                     displayCalib.center.x = (displayCalib.center.x - unused_offset.x) + offsets[i].x;
                     displayCalib.center.y = (displayCalib.center.y - unused_offset.y) + offsets[i].y;
 
-                    std::cout << "DEBUG-MULTIVIEW: Drawing camera " << i + 1
+                    std::cout << "DEBUG: Cam " << i + 1
                               << " center=(" << displayCalib.center.x << ","
-                              << displayCalib.center.y << "), dartboard offset from center=("
+                              << displayCalib.center.y << "), center offset=("
                               << (displayCalib.center.x - (region.cols / 2)) << ","
-                              << (displayCalib.center.y - (region.rows / 2)) << ")" << std::endl;
+                              << (displayCalib.center.y - (region.rows / 2)) << ")"
+                              << ", radius=(" << displayCalib.radius << ")"
+                              << ", orientation=" << displayCalib.orientation
+                              << std::endl;
 
                     // Use either competition style or debug style based on setting
                     if (competition_style)

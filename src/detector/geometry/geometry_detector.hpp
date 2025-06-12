@@ -25,8 +25,7 @@ protected:
     std::vector<DartboardCalibration> calibrations;
     std::vector<cv::Mat> background_frames;
 
-    // Detector methods
-    bool calibrateDartboard(const std::vector<cv::Mat> &frames);
+    // Detector methods - removed calibrateDartboard
     std::vector<DartDetection> findDarts(const cv::Mat &frame, const cv::Mat &background);
     cv::Mat preprocessFrame(const cv::Mat &frame, bool preserveColor = false);
 };

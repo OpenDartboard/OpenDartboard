@@ -32,7 +32,15 @@ bool GeometryDetector::initialize(const string &config_path, const vector<cv::Ma
     {
         cout << "Performing immediate calibration..." << endl;
 
-        calibrated = calibrateDartboard(initial_frames);
+        // Call calibration method directly instead of using wrapper
+        calibrations = DartboardCalibration::calibrateMultipleCameras(
+            initial_frames,
+            debug_mode,
+            target_width,
+            target_height);
+
+        calibrated = !calibrations.empty();
+
         if (calibrated)
         {
             // Save frames as background
@@ -57,7 +65,15 @@ vector<DartDetection> GeometryDetector::detectDarts(const vector<cv::Mat> &frame
     // Calibrate if needed
     if (!calibrated)
     {
-        calibrated = calibrateDartboard(frames);
+        // Call calibration method directly
+        calibrations = DartboardCalibration::calibrateMultipleCameras(
+            frames,
+            debug_mode,
+            target_width,
+            target_height);
+
+        calibrated = !calibrations.empty();
+
         if (!calibrated)
             return {};
 
@@ -225,65 +241,4 @@ cv::Mat GeometryDetector::preprocessFrame(const cv::Mat &frame, bool preserveCol
     // Apply Gaussian blur
     cv::GaussianBlur(gray, gray, cv::Size(5, 5), 0);
     return gray;
-}
-
-// SIMPLIFIED: Calibrate dartboard - just detect circle and use fixed orientation
-bool GeometryDetector::calibrateDartboard(const vector<cv::Mat> &frames)
-{
-    calibrations.clear();
-    cout << "\n===== DARTBOARD CALIBRATION STARTED =====\n";
-
-    if (frames.empty())
-    {
-        cerr << "No frames provided for calibration" << endl;
-        return false;
-    }
-
-    for (size_t cam_idx = 0; cam_idx < frames.size(); cam_idx++)
-    {
-        if (frames[cam_idx].empty())
-        {
-            cerr << "Empty frame from camera " << cam_idx + 1 << endl;
-            continue;
-        }
-
-        // Use the DartboardCalibration class instead of direct detection
-        DartboardCalibration calib;
-        if (calib.calibrateSingleCamera(frames[cam_idx], cam_idx, debug_mode))
-        {
-            calibrations.push_back(calib);
-        }
-        else
-        {
-            cout << "Failed to calibrate camera " << cam_idx + 1 << endl;
-        }
-    }
-
-    // Before saving multi-camera view, log all calibrations
-    if (!calibrations.empty())
-    {
-        cout << "DEBUG-CALIB: Final calibration summary:" << endl;
-        for (size_t i = 0; i < calibrations.size(); i++)
-        {
-            cout << "DEBUG-CALIB:   Camera " << i + 1
-                 << " center=(" << calibrations[i].center.x << "," << calibrations[i].center.y
-                 << "), radius=" << calibrations[i].radius << endl;
-        }
-    }
-
-    // Show multi-camera view with calibration overlay
-    if (debug_mode && !calibrations.empty())
-    {
-        // Use the centralized visualization function instead
-        dartboard_visualization::saveMultiCameraDebugView(
-            frames,
-            calibrations,
-            {}, // No detections during calibration
-            target_width,
-            target_height,
-            false); // Not using competition mode for debugging
-    }
-
-    cout << "===== DARTBOARD CALIBRATION COMPLETED =====\n";
-    return !calibrations.empty();
 }
