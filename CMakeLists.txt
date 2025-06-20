@@ -34,9 +34,16 @@ add_executable(opendartboard
     src/main.cpp
     src/scorer/scorer.cpp
     # src/detector/ai/yolo_detector.cpp
-    src/detector/geometry/geometry_detector.cpp
     src/detector/geometry/geometry_dartboard.cpp
-    src/detector/geometry/geometry_calibration.cpp 
+    src/detector/geometry/geometry_detector.cpp
+    # calibration files
+    src/detector/geometry/calibration/geometry_calibration.cpp
+    src/detector/geometry/calibration/color_processing.cpp
+    src/detector/geometry/calibration/contour_processing.cpp
+    src/detector/geometry/calibration/roi_processing.cpp
+    src/detector/geometry/calibration/ellipse_processing.cpp
+    src/detector/geometry/calibration/bull_processing.cpp
+    src/detector/geometry/calibration/mask_processing.cpp
 )
 
 target_include_directories(opendartboard PRIVATE

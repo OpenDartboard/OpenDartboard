@@ -1,0 +1,57 @@
+# ------------------------------------------------#
+# Bellow are helpful commands for building, testing, 
+# and deploying the OpenDartboard project.
+# ------------------------------------------------#
+
+#build
+./build.deb.sh # Build the Debian package
+
+# Copy the built package to the Raspberry Pi
+scp ./dist/opendartboard_0.11.0.deb pi@dart-relay.local:~
+
+# Uninstall the old package if it exists (rasberry pi)
+# what is the -y for? 
+# asnwer: It automatically answers "yes" to prompts during the uninstallation process.
+sudo apt remove opendartboard -y 
+
+# Install the new package
+sudo apt install ./opendartboard_0.x.0.deb
+
+# connect to the Raspberry Pi (change the name to your Pi's)
+ssh pi@dart-relay.local
+
+# ---------------- debuging commands --------------------------# 
+
+# Check the installed version using apt
+sudo apt list --installed | grep opendartboard
+
+# Check the status of the package using apt
+sudo apt show opendartboard
+
+# restart the service
+sudo systemctl restart opendartboard.service
+sudo systemctl restart lock_cams.service
+
+# restart systemd to apply changes
+sudo systemctl daemon-reload
+
+# Check logs in jurnalctl
+sudo journalctl -u opendartboard.service -f
+sudo journalctl -u lock_cams.service -f
+
+# Check logs in jurnalctl for both services
+sudo journalctl -u opendartboard.service -f & sudo journalctl -u lock_cams.service -f &
+
+# ---------------- docker commands  --------------------------# 
+
+# Run the Docker container with the current directory mounted
+docker run -it --rm  -v $PWD:/app opendartboard:latest /bin/bash
+
+#  Build the C program
+cmake -S . -B build -DCMAKE_PREFIX_PATH=/usr/local && cmake --build build -j4 && cp build/opendartboard /usr/local/bin/opendartboard
+
+# Run the c program
+opendartboard --debug --cams mocks/cam_1.mp4,mocks/cam_2.mp4,mocks/cam_3.mp4
+
+# all ine-line commands
+cmake -S . -B build -DCMAKE_PREFIX_PATH=/usr/local && cmake --build build -j4 && cp build/opendartboard /usr/local/bin/opendartboard && opendartboard --debug --cams mocks/cam_1.mp4,mocks/cam_2.mp4,mocks/cam_3.mp4 --width 1270 --height 720

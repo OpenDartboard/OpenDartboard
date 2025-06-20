@@ -20,15 +20,16 @@ Scorer::Scorer(const string &model, int w, int h, int fps, const vector<string> 
   // Create the appropriate detector - pass debug flag AND resolution to detector
   detector = DetectorFactory::createDetector(use_ai_detector, debug_display, width, height);
 
-  // Capture initial frames to use for calibration
-  vector<Mat> initial_frames = captureFrames();
+  // Capture AVERAGED initial frames to use for calibration (reduces noise)
+  cout << "Capturing and averaging frames for calibration..." << endl;
+  vector<Mat> initial_frames = captureAndAverageFrames(frameParams.calibrationFrames);
 
   // Allow several attempts to get good calibration frames
-  for (int attempt = 0; attempt < 3 && initial_frames.empty(); attempt++)
+  for (int attempt = 0; attempt < frameParams.retryAttempts && initial_frames.empty(); attempt++)
   {
     cout << "Retrying to capture initial frames, attempt " << attempt + 1 << endl;
-    this_thread::sleep_for(chrono::milliseconds(500));
-    initial_frames = captureFrames();
+    this_thread::sleep_for(chrono::milliseconds(frameParams.retryDelayMs));
+    initial_frames = captureAndAverageFrames(frameParams.calibrationFrames);
   }
 
   if (initial_frames.empty())
@@ -187,6 +188,65 @@ vector<Mat> Scorer::captureFrames()
   return frames;
 }
 
+// SIMPLIFIED frame averaging - remove contrast enhancement
+vector<Mat> Scorer::captureAndAverageFrames(int numFrames)
+{
+  vector<Mat> averagedFrames;
+
+  // Capture multiple frame sets
+  vector<vector<Mat>> allFrameSets;
+  for (int i = 0; i < numFrames; i++)
+  {
+    vector<Mat> frameSet = captureFrames();
+    if (!frameSet.empty())
+    {
+      allFrameSets.push_back(frameSet);
+    }
+
+    // FIXED: Use FPS-based delay instead of hardcoded 50ms
+    int frameIntervalMs = 1000 / fps; // Calculate milliseconds per frame
+    this_thread::sleep_for(chrono::milliseconds(frameIntervalMs));
+  }
+
+  if (allFrameSets.empty())
+    return vector<Mat>();
+
+  // Average frames for each camera
+  for (size_t cam = 0; cam < allFrameSets[0].size(); cam++)
+  {
+    if (allFrameSets.size() == 1)
+    {
+      averagedFrames.push_back(allFrameSets[0][cam]);
+      continue;
+    }
+
+    // Convert first frame to floating point for averaging
+    Mat averaged;
+    allFrameSets[0][cam].convertTo(averaged, CV_32F);
+
+    // Add all other frames for this camera
+    for (size_t frameSet = 1; frameSet < allFrameSets.size(); frameSet++)
+    {
+      if (cam < allFrameSets[frameSet].size())
+      {
+        Mat temp;
+        allFrameSets[frameSet][cam].convertTo(temp, CV_32F);
+        averaged += temp;
+      }
+    }
+
+    // Divide by number of frames to get average
+    averaged /= static_cast<float>(allFrameSets.size());
+
+    Mat result;
+    averaged.convertTo(result, CV_8U);
+
+    averagedFrames.push_back(result);
+  }
+
+  return averagedFrames;
+}
+
 // The main run method that starts the vision thread
 void Scorer::stop()
 {
@@ -260,7 +320,7 @@ bool Scorer::detectMotion(const vector<Mat> &current_frames)
 
     // Count non-zero pixels to determine amount of motion
     int motion_pixels = countNonZero(motion_mask);
-    int motion_threshold = (motion_mask.rows * motion_mask.cols) / 20; // 5% of frame
+    int motion_threshold = (motion_mask.rows * motion_mask.cols) * motionParams.motionThresholdRatio;
 
     if (motion_pixels > motion_threshold)
     {
@@ -287,8 +347,8 @@ bool Scorer::detectMotion(const vector<Mat> &current_frames)
 
 string Scorer::detect_score()
 {
-  // Step 1: Capture frames from all cameras
-  vector<Mat> frames = captureFrames();
+  // Step 1: Capture frames from all cameras (use averaging for better quality)
+  vector<Mat> frames = captureAndAverageFrames(frameParams.detectionFrames); // Average 3 frames for detection
 
   if (frames.empty())
   {
@@ -321,7 +381,7 @@ string Scorer::detect_score()
 
   case DetectionState::MOTION_DETECTED:
     // If motion has stopped for a certain period, we might have a dart
-    if (!motion && chrono::duration_cast<chrono::milliseconds>(now - last_motion_time).count() > 500)
+    if (!motion && chrono::duration_cast<chrono::milliseconds>(now - last_motion_time).count() > motionParams.motionStabilizeMs)
     {
       detection_state = DetectionState::DART_DETECTED;
 

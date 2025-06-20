@@ -39,10 +39,6 @@ public:
     double detectOrientation(const cv::Mat &frame, const cv::Point &center, double radius,
                              const cv::Mat &redMask, const cv::Mat &greenMask, bool debugMode = false);
 
-    // New method: Correct perspective distortion in the dartboard image
-    cv::Mat correctPerspective(const cv::Mat &frame, const cv::Point &center,
-                               double radius, const cv::RotatedRect &ellipse, bool debugMode = false);
-
     // Static method to create a standard calibration - updated with axes and angle parameters
     static DartboardCalibration createStandardCalibration(
         cv::Point center, double radius, double orientation,

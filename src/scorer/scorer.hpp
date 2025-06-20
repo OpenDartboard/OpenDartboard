@@ -78,4 +78,26 @@ private:
   // Detector - using the common interface
   std::unique_ptr<DartDetector> detector;
   bool use_ai_detector = false;
+
+  // Frame averaging for noise reduction
+  std::vector<cv::Mat> captureAndAverageFrames(int numFrames = 1);
+
+  // Frame averaging configuration parameters
+  struct FrameAveragingParams
+  {
+    int calibrationFrames = 75; // Number of frames to average for calibration (75 = perfect balance)
+    int detectionFrames = 3;    // Number of frames to average for real-time detection
+    int retryAttempts = 3;      // Number of calibration retry attempts if capture fails
+    int retryDelayMs = 1000;    // Delay between retry attempts in milliseconds
+  };
+
+  // Motion detection parameters
+  struct MotionDetectionParams
+  {
+    double motionThresholdRatio = 0.05; // Motion threshold as ratio of frame pixels (5% = 1/20)
+    int motionStabilizeMs = 500;        // Wait time after motion stops before detecting dart
+  };
+
+  FrameAveragingParams frameParams;
+  MotionDetectionParams motionParams;
 };
