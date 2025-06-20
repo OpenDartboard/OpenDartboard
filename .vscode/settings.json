@@ -66,6 +66,8 @@
     "sstream": "cpp",
     "__nullptr": "cpp",
     "__string": "cpp",
-    "concepts": "cpp"
+    "concepts": "cpp",
+    "map": "cpp",
+    "stack": "cpp"
   }
 }

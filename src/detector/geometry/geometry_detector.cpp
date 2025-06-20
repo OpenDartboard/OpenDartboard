@@ -1,6 +1,6 @@
 #include "geometry_detector.hpp"
 #include "geometry_dartboard.hpp"
-#include "geometry_calibration.hpp"
+#include "calibration/geometry_calibration.hpp"
 #include "utils/dartboard_visualization.hpp"
 #include "utils/math_utils.hpp"
 #include <iostream>
@@ -104,12 +104,6 @@ vector<DartDetection> GeometryDetector::detectDarts(const vector<cv::Mat> &frame
 
         // Add to overall detections
         all_detections.insert(all_detections.end(), camera_detections.begin(), camera_detections.end());
-    }
-
-    // Show multi-camera debug view
-    if (debug_mode && !all_detections.empty())
-    {
-        dartboard_visualization::saveMultiCameraDebugView(frames, calibrations, all_detections, target_width, target_height, false);
     }
 
     return all_detections;

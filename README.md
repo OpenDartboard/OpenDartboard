@@ -2,8 +2,8 @@
 
 **OpenDartboard** is a hobby-friendly, fully FOSS toolkit for building an automatic _steel-tip_ dart–scoring station:
 
-- **Headless Scorer** — Uses a Raspberry Pi Zero 2 W with 3 cameras to detect darts and output scores in standard notation (T20, S5, D12, …).
-- **Computer Vision** — Lightweight YOLOv8-nano model with ncnn acceleration to run efficiently on a Pi Zero 2 W..
+- **Headless Scorer** — Uses a Raspberry Pi Zero 2 W with 3 cameras to detect darts and output scores in standard notation (T20, S5, D12, …) via a easy to consume WebSocket API.
+- **Computer Vision** — Lightweight OpenCV, YOLOv8-nano model with ncnn acceleration to run efficiently on a Pi Zero 2 W..
 
 The goal: **drop-in freedom** for home tinkerers who want “Autodarts-style” scoring without closed hardware, subscriptions, or vendor lock-in.
 
@@ -13,9 +13,9 @@ The goal: **drop-in freedom** for home tinkerers who want “Autodarts-style” 
 
 | Phase           | Target                                             | ETA      |
 | --------------- | -------------------------------------------------- | -------- |
-| **MVP**         | Zero 2 W with YOLOv8-nano scoring                  | ✅ works |
 | **Packaging**   | Debian package (.deb) for easy installation        | ✅ works |
 | **Development** | Docker-based dev environment for consistent builds | ✅ works |
+| **MVP**         | Zero 2 W with YOLOv8-nano scoring                  | WIP      |
 | **Polish**      | Auto-calibration and improved accuracy             | T.B.D    |
 | **Stretch**     | Stats DB, cloud sync                               | T.B.D    |
 
@@ -25,8 +25,8 @@ The goal: **drop-in freedom** for home tinkerers who want “Autodarts-style” 
 
 | Layer               | Tech                              | Notes                                     |
 | ------------------- | --------------------------------- | ----------------------------------------- |
-| **Computer Vision** | `YOLOv8-nano` · `ncnn`            | Optimized INT8 model for arm32            |
-| **Runtime**         | C++ · `OpenCV` · `ncnn`           | High-performance dart detection           |
+| **Computer Vision** | `YOLOv8-nano` · `ncnn` · `OpenCV` | Optimized INT8 model for arm32            |
+| **Runtime**         | C++                               | High-performance dart detection           |
 | **Infrastructure**  | `systemd` services · `udev` rules | Reliable auto-start and camera management |
 | **Development**     | `Docker` · `Debian Bullseye`      | Reproducible build environment            |
 | **Distribution**    | `.deb` package                    | CI checks, One-command installation       |
@@ -74,13 +74,13 @@ docker-compose up -d
 ./make.sh
 ```
 
-## 6. Roadmap
+## 6. Roadmap (MVP 1.0)
 
-- Improved tip detection accuracy
-- Web interface for visualization
 - Camera auto-calibration
-- Score history and statistics
-- Cloud sync + friend leaderboards (optional, privacy-first)
+- Tip detection
+- WebSocket api
+- ASCII HDMI output
+- Configurations/options
 
 ## 7. Contributing
 
