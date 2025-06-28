@@ -11,8 +11,6 @@ public:
     // Define standard dartboard segment values (clockwise order)
     static const int standardSegments[20];
 
-    // Remove visualization methods - now in dartboard_visualization.hpp
-
     // Calculate score from dart position and calibration
     static std::string calculateScore(const cv::Point &dartPosition, const DartboardCalibration &calib);
 

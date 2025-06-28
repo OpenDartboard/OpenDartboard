@@ -155,4 +155,110 @@ namespace debug
         return thresh;
     }
 
+    // Create combined calibration visualization showing all processing steps
+    inline cv::Mat createCombinedCalibrationVisualization(int numCameras, const std::string &baseDir = "debug_frames")
+    {
+        std::vector<std::string> stepNames = {
+            "1. ROI Processing",
+            "2. Color Processing",
+            "3. Bull Processing",
+            "4. Mask Processing",
+            // temporarily disabled contour processing
+            // "5. Contour Processing",
+            "6. Ellipse Processing",
+            "7. Final Calibration"};
+
+        std::vector<std::string> stepPaths = {
+            "roi_processing/roi_frame_",
+            "color_processing/red_green_frame_",
+            "bull_processing/bull_detection_",
+            "mask_processing/mask_grid_",
+            // temporarily disabled contour processing
+            // "contour_processing/contours_",
+            "ellipse_processing/ellipse_result_",
+            "geometry_calibration/calibration_camera_"};
+
+        // Load first image to get dimensions
+        cv::Mat firstImage = cv::imread(baseDir + "/" + stepPaths[0] + "0.jpg");
+        if (firstImage.empty())
+        {
+            std::cout << "ERROR: Could not load debug images for combined visualization" << std::endl;
+            return cv::Mat::zeros(480, 640, CV_8UC3);
+        }
+
+        int imgWidth = firstImage.cols;
+        int imgHeight = firstImage.rows;
+        int labelHeight = 40;
+        int padding = 10;
+
+        // Calculate combined image dimensions
+        int combinedWidth = (imgWidth + padding) * numCameras + padding;
+        int combinedHeight = (imgHeight + labelHeight + padding) * stepNames.size() + labelHeight + padding;
+
+        cv::Mat combinedImage = cv::Mat::zeros(combinedHeight, combinedWidth, CV_8UC3);
+        combinedImage.setTo(cv::Scalar(50, 50, 50)); // Dark gray background
+
+        // Add title
+        cv::putText(combinedImage, "OpenDartboard Calibration Pipeline - All Cameras",
+                    cv::Point(20, 30), cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(255, 255, 255), 2);
+
+        // Add camera headers
+        for (int cam = 0; cam < numCameras; cam++)
+        {
+            int x = padding + cam * (imgWidth + padding);
+            int y = labelHeight + 20;
+            cv::putText(combinedImage, "Camera " + std::to_string(cam),
+                        cv::Point(x + imgWidth / 2 - 50, y), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(255, 255, 255), 2);
+        }
+
+        // Process each step
+        for (size_t step = 0; step < stepNames.size(); step++)
+        {
+            int stepY = labelHeight + padding + step * (imgHeight + labelHeight + padding);
+
+            // Add step label
+            cv::putText(combinedImage, stepNames[step],
+                        cv::Point(20, stepY + labelHeight - 5), cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(0, 255, 255), 2);
+
+            // Add images for each camera
+            for (int cam = 0; cam < numCameras; cam++)
+            {
+                std::string imagePath = baseDir + "/" + stepPaths[step] + std::to_string(cam) + ".jpg";
+                cv::Mat stepImage = cv::imread(imagePath);
+
+                if (!stepImage.empty())
+                {
+                    int x = padding + cam * (imgWidth + padding);
+                    int y = stepY + labelHeight;
+
+                    // Ensure the image fits in the allocated space
+                    if (stepImage.cols != imgWidth || stepImage.rows != imgHeight)
+                    {
+                        cv::resize(stepImage, stepImage, cv::Size(imgWidth, imgHeight));
+                    }
+
+                    cv::Rect roi(x, y, imgWidth, imgHeight);
+                    if (roi.x + roi.width <= combinedImage.cols && roi.y + roi.height <= combinedImage.rows)
+                    {
+                        stepImage.copyTo(combinedImage(roi));
+                    }
+                }
+                else
+                {
+                    // Draw placeholder for missing image
+                    int x = padding + cam * (imgWidth + padding);
+                    int y = stepY + labelHeight;
+                    cv::Rect roi(x, y, imgWidth, imgHeight);
+                    cv::rectangle(combinedImage, roi, cv::Scalar(100, 100, 100), -1);
+                    cv::putText(combinedImage, "Missing Image",
+                                cv::Point(x + 20, y + imgHeight / 2), cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 255, 255), 1);
+
+                    std::cout << "DEBUG: Missing image: " << imagePath << std::endl;
+                }
+            }
+        }
+
+        return combinedImage;
+    }
+
 } // namespace debug

@@ -8,14 +8,9 @@ using namespace std;
 
 namespace bull_processing
 {
-    Point processBull(
-        const Mat &redGreenFrame,
-        const Mat &mask,
-        const Point &frameCenter,
-        int camera_idx,
-        bool debug_mode,
-        const BullParams &params)
+    Point processBull(const Mat &redGreenFrame, const Point &frameCenter, int camera_idx, bool debug_mode, const BullParams &params)
     {
+        cout << "DEBUG: Bull detection camera " << camera_idx << " starting..." << endl;
         double confidence;
 
         // Extract red pixels from redGreenFrame
@@ -32,23 +27,16 @@ namespace bull_processing
             }
         }
 
-        // Calculate feature density for adaptive parameters
-        double featureDensity = countNonZero(mask) / static_cast<double>(mask.total());
-
         Point bestCenter = frameCenter;
         double bestScore = 0;
 
         // Strategy A: Bull's eye detection
         Mat bullsEye = redMask.clone();
-        morphologyEx(bullsEye, bullsEye, MORPH_CLOSE,
-                     getStructuringElement(MORPH_ELLIPSE, Size(3, 3)));
-
+        morphologyEx(bullsEye, bullsEye, MORPH_CLOSE, getStructuringElement(MORPH_ELLIPSE, Size(3, 3)));
         vector<vector<Point>> bullContours;
         findContours(bullsEye, bullContours, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE);
 
-        cout << "DEBUG: Strategy A - Found " << bullContours.size() << " bull contours" << endl;
-
-        // Process bull contours
+        // Strategy A: Process bull contours
         for (const auto &contour : bullContours)
         {
             double area = contourArea(contour);
@@ -67,13 +55,54 @@ namespace bull_processing
             float radius2f;
             minEnclosingCircle(contour, center2f, radius2f);
 
-            // Scoring based on distance from frame center
-            double maxDist = norm(Point(0, 0) - Point(redGreenFrame.cols, redGreenFrame.rows)) / 2.0;
+            //  Bull must be very close to center
             double distToCenter = norm(Point(center2f) - frameCenter);
-            double centralityScore = 1.0 - (distToCenter / maxDist);
+            double maxAllowedDistance = min(redGreenFrame.cols, redGreenFrame.rows) / 6.0; //  1/6
 
-            // Combined score weighted by circularity and centrality
-            double score = circularity * params.circularityWeight + centralityScore * params.centralityWeight;
+            // temporary removed to not clutter the output
+            // cout << "DEBUG: Strategy A - Frame size: " << redGreenFrame.cols << "x" << redGreenFrame.rows
+            //      << ", center: (" << frameCenter.x << "," << frameCenter.y << ")" << endl;
+            // cout << "DEBUG: Strategy A - Contour center: (" << center2f.x << "," << center2f.y
+            //      << "), distance: " << distToCenter << ", max allowed: " << maxAllowedDistance << endl;
+
+            if (distToCenter > maxAllowedDistance)
+            {
+                // temporary removed to not clutter the output
+                // cout << "DEBUG: Strategy A - REJECTED contour too far from center!" << endl;
+                continue;
+            }
+
+            // Enhanced centrality scoring
+            double maxDist = norm(Point(0, 0) - Point(redGreenFrame.cols, redGreenFrame.rows)) / 2.0;
+            double centralityScore = 1.0 - (distToCenter / maxDist);
+            double enhancedCentralityScore = centralityScore * centralityScore; // Square for stronger penalty
+
+            // Size-based scoring - heavily favor smaller contours (bull should be small!)
+            double idealArea = redGreenFrame.total() * params.idealBullAreaPercent;
+            double sizeScore = 1.0;
+
+            if (area > idealArea)
+            {
+                // Penalize larger areas exponentially
+                double sizeFactor = area / idealArea;
+                sizeScore = max(1.0 - params.maxSizePenalty, 1.0 / (sizeFactor * sizeFactor));
+            }
+            else
+            {
+                // Slightly favor areas closer to ideal
+                sizeScore = 1.0 - (abs(area - idealArea) / idealArea) * 0.2;
+            }
+
+            // Combined score with size factor
+            double score = (circularity * params.circularityWeight +
+                            enhancedCentralityScore * params.centralityWeight +
+                            sizeScore * params.sizeWeight) /
+                           (params.circularityWeight + params.centralityWeight + params.sizeWeight);
+
+            // temporary removed to not clutter the output
+            // cout << "DEBUG: Strategy A - ACCEPTED contour - area: " << area << ", ideal: " << idealArea
+            //      << ", sizeScore: " << sizeScore << ", centrality: " << enhancedCentralityScore
+            //      << ", TOTAL: " << score << endl;
 
             if (score > bestScore)
             {
@@ -84,11 +113,19 @@ namespace bull_processing
         }
 
         // Strategy B: Circular pattern detection with adaptive parameters
-        if (bestScore < 0.5)
+        if (bestScore < params.minAcceptableScore)
         {
+
             cout << "DEBUG: Strategy B - Trying Hough circles (bestScore=" << bestScore << ")" << endl;
 
             // Create circle detection mask
+            // Calculate feature density for adaptive parameters
+
+            Mat mask;
+            cvtColor(redGreenFrame, mask, COLOR_BGR2GRAY); // Convert colored frame to grayscale
+            threshold(mask, mask, 1, 255, THRESH_BINARY);  // Threshold: any non-black pixel becomes white
+
+            double featureDensity = countNonZero(mask) / static_cast<double>(mask.total());
             Mat circleMask = mask.clone();
             morphologyEx(circleMask, circleMask, MORPH_OPEN,
                          getStructuringElement(MORPH_ELLIPSE, Size(3, 3)));
@@ -119,6 +156,19 @@ namespace bull_processing
                 {
                     Point circleCenter(cvRound(circles[i][0]), cvRound(circles[i][1]));
 
+                    // MUCH MORE STRICT: Same stricter check for circles
+                    double distToCenter = norm(circleCenter - frameCenter);
+                    double maxAllowedDistance = min(redGreenFrame.cols, redGreenFrame.rows) / 6.0; // CHANGED: 1/6 instead of 1/4
+
+                    cout << "DEBUG: Strategy B - Circle center: (" << circleCenter.x << "," << circleCenter.y
+                         << "), distance: " << distToCenter << ", max allowed: " << maxAllowedDistance << endl;
+
+                    if (distToCenter > maxAllowedDistance)
+                    {
+                        cout << "DEBUG: Strategy B - REJECTED circle too far from center!" << endl;
+                        continue;
+                    }
+
                     // Check for red content near center (potential bull)
                     int roiSize = max(5, min(20, redGreenFrame.cols / 30));
                     Rect roi(
@@ -134,13 +184,15 @@ namespace bull_processing
                     Mat centerROI = redMask(roi);
                     double centerRedness = countNonZero(centerROI) / static_cast<double>(centerROI.total());
 
-                    // Centrality measure
+                    // Centrality measure with enhanced penalty
                     double maxDist = norm(Point(0, 0) - Point(redGreenFrame.cols, redGreenFrame.rows)) / 2.0;
-                    double distToCenter = norm(circleCenter - frameCenter);
                     double centralityScore = 1.0 - (distToCenter / maxDist);
+                    double enhancedCentralityScore = centralityScore * centralityScore; // Square for stronger penalty
 
                     // Combined score
-                    double circleScore = centralityScore * params.centerProximityWeight + centerRedness * params.rednessWeight;
+                    double circleScore = enhancedCentralityScore * params.centerProximityWeight + centerRedness * params.rednessWeight;
+
+                    cout << "DEBUG: Strategy B - Circle at (" << circleCenter.x << "," << circleCenter.y << ") - dist=" << distToCenter << ", score=" << circleScore << endl;
 
                     if (circleScore > bestCircleScore)
                     {
@@ -165,6 +217,10 @@ namespace bull_processing
             cout << "DEBUG: Strategy C - Trying density map (bestScore=" << bestScore << ")" << endl;
 
             Mat densityMap = Mat::zeros(redGreenFrame.size(), CV_32F);
+            Mat mask;
+            cvtColor(redGreenFrame, mask, COLOR_BGR2GRAY); // Convert colored frame to grayscale
+            threshold(mask, mask, 1, 255, THRESH_BINARY);  // Threshold: any non-black pixel becomes white
+            double featureDensity = countNonZero(mask) / static_cast<double>(mask.total());
 
             // Create density map from mask
             for (int y = 0; y < mask.rows; y++)
@@ -209,14 +265,14 @@ namespace bull_processing
         cout << "DEBUG: Bull detection complete - center=(" << bestCenter.x << "," << bestCenter.y
              << "), confidence=" << confidence << endl;
 
-        // Debug output
+        // Debug output with PURPLE visualization
         if (debug_mode)
         {
             system("mkdir -p debug_frames/bull_processing");
 
             Mat bullDebug = redGreenFrame.clone();
-            circle(bullDebug, bestCenter, 5, Scalar(255, 255, 0), -1); // Yellow center dot
-            circle(bullDebug, bestCenter, 20, Scalar(0, 255, 255), 2); // Yellow circle (just for visualization)
+            circle(bullDebug, bestCenter, 5, Scalar(255, 255, 255), -1); // Purple center dot
+            circle(bullDebug, bestCenter, 20, Scalar(255, 255, 255), 3); // Purple circle
 
             imwrite("debug_frames/bull_processing/bull_detection_" + to_string(camera_idx) + ".jpg", bullDebug);
         }

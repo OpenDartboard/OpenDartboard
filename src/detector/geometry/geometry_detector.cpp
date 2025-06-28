@@ -1,10 +1,10 @@
+#include <iostream>
+#include <algorithm>
+
 #include "geometry_detector.hpp"
 #include "geometry_dartboard.hpp"
 #include "calibration/geometry_calibration.hpp"
-#include "utils/dartboard_visualization.hpp"
-#include "utils/math_utils.hpp"
-#include <iostream>
-#include <algorithm>
+#include "../../utils/math.hpp"
 
 using namespace cv;
 using namespace std;
@@ -33,7 +33,7 @@ bool GeometryDetector::initialize(const string &config_path, const vector<cv::Ma
         cout << "Performing immediate calibration..." << endl;
 
         // Call calibration method directly instead of using wrapper
-        calibrations = DartboardCalibration::calibrateMultipleCameras(
+        calibrations = geometry_calibration::calibrateMultipleCameras(
             initial_frames,
             debug_mode,
             target_width,
@@ -66,7 +66,7 @@ vector<DartDetection> GeometryDetector::detectDarts(const vector<cv::Mat> &frame
     if (!calibrated)
     {
         // Call calibration method directly
-        calibrations = DartboardCalibration::calibrateMultipleCameras(
+        calibrations = geometry_calibration::calibrateMultipleCameras(
             frames,
             debug_mode,
             target_width,
@@ -160,7 +160,7 @@ vector<DartDetection> GeometryDetector::findDarts(const Mat &frame, const Mat &b
         {
             for (const auto &pt : contour)
             {
-                double dist = math_utils::distanceToPoint(pt, calib.center);
+                double dist = math::distanceToPoint(pt, calib.center);
                 if (dist < min_dist)
                 {
                     min_dist = dist;
@@ -170,16 +170,18 @@ vector<DartDetection> GeometryDetector::findDarts(const Mat &frame, const Mat &b
             }
         }
 
+        int radius = 50; // hadcoded for now;
+
         // Validate dart candidate
         if (best_point.x >= 0 && closest_calib)
         {
-            double dist_to_center = math_utils::distanceToPoint(best_point, closest_calib->center);
-            if (dist_to_center <= closest_calib->radius * 1.5)
+            double dist_to_center = math::distanceToPoint(best_point, closest_calib->center);
+            if (dist_to_center <= radius * 1.5)
             {
                 // Create detection
                 DartDetection detection;
                 detection.position = best_point;
-                detection.confidence = 0.9 - (dist_to_center / (closest_calib->radius * 2.0));
+                detection.confidence = 0.9 - (dist_to_center / (radius * 2.0));
                 detection.score = GeometryDartboard::calculateScore(best_point, *closest_calib);
                 all_detections.push_back(detection);
             }
@@ -200,7 +202,7 @@ vector<DartDetection> GeometryDetector::findDarts(const Mat &frame, const Mat &b
         bool is_duplicate = false;
         for (const auto &accepted : filtered_detections)
         {
-            if (math_utils::distanceToPoint(det.position, accepted.position) < DUPLICATE_THRESHOLD)
+            if (math::distanceToPoint(det.position, accepted.position) < DUPLICATE_THRESHOLD)
             {
                 is_duplicate = true;
                 break;

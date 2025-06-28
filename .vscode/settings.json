@@ -68,6 +68,10 @@
     "__string": "cpp",
     "concepts": "cpp",
     "map": "cpp",
-    "stack": "cpp"
+    "stack": "cpp",
+    "filesystem": "cpp",
+    "__tree": "cpp",
+    "numeric": "cpp",
+    "random": "cpp"
   }
 }

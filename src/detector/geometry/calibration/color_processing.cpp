@@ -289,12 +289,8 @@ namespace color_processing
         return redGreenFrame; // CLEAN: Return colored frame directly!
     }
 
-    // Optional helper for when individual masks are needed
-    void getIndividualColorMasks(
-        const Mat &roiFrame,
-        Mat &redMask,
-        Mat &greenMask,
-        const ColorParams &params)
+    // Helper for when individual masks are needed
+    pair<Mat, Mat> getIndividualColorMasks(const Mat &roiFrame, const ColorParams &params)
     {
         // Simplified version of color detection that just returns the masks
         Mat hsvFrame;
@@ -308,12 +304,15 @@ namespace color_processing
         inRange(hsvFrame,
                 Scalar(params.redLowHue2, params.redLowSat2, params.redLowVal2),
                 Scalar(params.redHighHue2, params.redHighSat2, params.redHighVal2), redMask2);
-        redMask = redMask1 | redMask2;
+        Mat redMask = redMask1 | redMask2;
 
         // Basic green detection
+        Mat greenMask;
         inRange(hsvFrame,
                 Scalar(params.greenLowHue, params.greenLowSat, params.greenLowVal),
                 Scalar(params.greenHighHue, params.greenHighSat, params.greenHighVal), greenMask);
+
+        return {redMask, greenMask};
     }
 
 } // namespace color_detection
