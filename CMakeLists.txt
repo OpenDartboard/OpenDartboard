@@ -44,6 +44,7 @@ add_executable(opendartboard
     src/detector/geometry/calibration/ellipse_processing.cpp
     src/detector/geometry/calibration/bull_processing.cpp
     src/detector/geometry/calibration/mask_processing.cpp
+    src/detector/geometry/calibration/wire_processing.cpp
 )
 
 target_include_directories(opendartboard PRIVATE

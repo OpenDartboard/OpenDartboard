@@ -4,18 +4,41 @@
 using namespace cv;
 using namespace std;
 
+// NOTES: CURRENTLY THIS MODULE IS NOT USED IN THE NEW PIPELINE
+
 namespace contour_processing
 {
-    vector<vector<Point>> processContours( // FIXED: Correct function name
-        const Mat &mask,
-        const Mat &originalFrame, // FIXED: Add missing parameter
+    Mat visualizeContours(
+        const Mat &originalFrame,
+        const vector<vector<Point>> &contours,
+        const ContourParams &params)
+    {
+
+        Mat visualization = originalFrame.clone();
+        drawContours(
+            visualization,
+            contours,
+            -1, // Draw all contours
+            params.contourColor,
+            params.contourThickness);
+
+        return visualization;
+    }
+
+    vector<vector<Point>> processContours(
+        const Mat &redGreenFrame,
+        const Mat &originalFrame,
         int camera_idx,
         bool debug_mode,
         const ContourParams &params)
     {
         // Find all contours in the mask
         vector<vector<Point>> allContours;
-        cv::findContours(mask.clone(), allContours, params.contourMode, params.contourMethod);
+        // convert to black and white mask
+        Mat mask;
+        cvtColor(redGreenFrame, mask, COLOR_BGR2GRAY); // Convert colored frame to grayscale
+        threshold(mask, mask, 1, 255, THRESH_BINARY);  // Threshold: any non-black pixel becomes white
+        findContours(mask.clone(), allContours, params.contourMode, params.contourMethod);
 
         // Filter contours based on area
         vector<vector<Point>> filteredContours;
@@ -47,46 +70,6 @@ namespace contour_processing
         }
 
         return filteredContours;
-    }
-
-    cv::Mat visualizeContours(
-        const Mat &originalFrame,
-        const vector<vector<Point>> &contours,
-        const ContourParams &params)
-    {
-
-        Mat visualization = originalFrame.clone();
-        drawContours(
-            visualization,
-            contours,
-            -1, // Draw all contours
-            params.contourColor,
-            params.contourThickness);
-
-        return visualization;
-    }
-
-    // TODO: determine if this is needed
-    Mat createEnhancedContourMask(const Mat &inputMask, const ContourParams &params)
-    {
-        // Start with a copy of the input mask
-        Mat contourMask = inputMask.clone();
-
-        // Step 1: Dilate to connect broken segments
-        Mat dilationKernel = getStructuringElement(
-            params.dilationShape,
-            Size(params.dilationKernelSize, params.dilationKernelSize));
-        dilate(inputMask, contourMask, dilationKernel);
-
-        // Step 2: Extract edges to highlight ring features
-        Mat edges;
-        Laplacian(contourMask, edges, CV_8U, params.laplacianKernelSize);
-        threshold(edges, edges, params.edgeThreshold, 255, THRESH_BINARY);
-
-        // Step 3: Combine original mask with edges
-        contourMask = contourMask | edges;
-
-        return contourMask;
     }
 
 } // namespace contour_processing

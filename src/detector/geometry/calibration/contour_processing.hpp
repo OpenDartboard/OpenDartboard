@@ -35,23 +35,12 @@ namespace contour_processing
         int contourThickness = 3;                          // Line thickness for contour drawing
     };
 
-    // Creates enhanced mask for contour detection
-    cv::Mat createEnhancedContourMask(
-        const cv::Mat &inputMask,
-        const ContourParams &params = ContourParams());
-
-    // CLEAN: Main function - mask in, contours out
+    // Main function - mask in, contours out
     std::vector<std::vector<cv::Point>> processContours(
-        const cv::Mat &mask,
-        const cv::Mat &originalFrame, // FIXED: Add cv:: qualifier
+        const cv::Mat &redGreenFrame,
+        const cv::Mat &originalFrame,
         int camera_idx = 0,
         bool debug_mode = false,
-        const ContourParams &params = ContourParams());
-
-    // OPTIONAL: Debug visualization
-    cv::Mat visualizeContours(
-        const cv::Mat &originalFrame,
-        const std::vector<std::vector<cv::Point>> &contours,
         const ContourParams &params = ContourParams());
 
 } // namespace contour_processing

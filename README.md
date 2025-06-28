@@ -3,7 +3,7 @@
 **OpenDartboard** is a hobby-friendly, fully FOSS toolkit for building an automatic _steel-tip_ dart–scoring station:
 
 - **Headless Scorer** — Uses a Raspberry Pi Zero 2 W with 3 cameras to detect darts and output scores in standard notation (T20, S5, D12, …) via a easy to consume WebSocket API.
-- **Computer Vision** — Lightweight OpenCV, YOLOv8-nano model with ncnn acceleration to run efficiently on a Pi Zero 2 W..
+- **Computer Vision** — Lightweight OpenCV, YOLOv8-nano model with ncnn acceleration to run efficiently on a Pi Zero 2 W.
 
 The goal: **drop-in freedom** for home tinkerers who want “Autodarts-style” scoring without closed hardware, subscriptions, or vendor lock-in.
 
@@ -15,9 +15,10 @@ The goal: **drop-in freedom** for home tinkerers who want “Autodarts-style” 
 | --------------- | -------------------------------------------------- | -------- |
 | **Packaging**   | Debian package (.deb) for easy installation        | ✅ works |
 | **Development** | Docker-based dev environment for consistent builds | ✅ works |
-| **MVP**         | Zero 2 W with YOLOv8-nano scoring                  | WIP      |
-| **Polish**      | Auto-calibration and improved accuracy             | T.B.D    |
-| **Stretch**     | Stats DB, cloud sync                               | T.B.D    |
+| **MVP**         | Auto-calibration via OpenCV                        | WIP      |
+| **MMR**         | Scoring via YOLOv8-nano,                           | T.B.D    |
+| **Polish**      | improved accuracy & Auto-calibration and           | T.B.D    |
+| **Stretch**     | WebSocket API / HDMI ASCII output                  | T.B.D    |
 
 ---
 
@@ -35,20 +36,24 @@ The goal: **drop-in freedom** for home tinkerers who want “Autodarts-style” 
 
 ## 3 Hardware Reference
 
-| Item         | Minimum spec                                      | Example                       |
-| ------------ | ------------------------------------------------- | ----------------------------- |
-| SBC          | Raspberry Pi Zero 2 W (+ self-powered USB 2 hub)  | Waveshare USB HUB HAT (B)     |
-| Cameras (×3) | USB 2.0 webcams outputting MJPEG @ 640x480 15 fps | HBVCAM OV2710 100°            |
-| Lighting     | 360° LED ring                                     | DIY SmartLite 12 V LED 6000 K |
-| Optional     | 5 V / 3 A PSU                                     | Any USB-C PD brick + adapter  |
+| Item         | Minimum spec                                       | Example                       |
+| ------------ | -------------------------------------------------- | ----------------------------- |
+| SBC          | Raspberry Pi Zero 2 W (+ self-powered USB 2 hub)   | Waveshare USB HUB HAT (B)     |
+| Cameras (×3) | USB 2.0 webcams outputting MJPEG @ 1280x720 30 fps | HBVCAM OV2710 100°            |
+| Lighting     | 360° LED ring                                      | DIY SmartLite 12 V LED 6000 K |
+| Power        | 5 V / 3 A PSU                                      | Any USB-C PD brick + adapter  |
 
 ---
 
 ## 4 Quick Start
 
 ```shell
-# 0 Flash Raspberry Pi OS Lite (64-bit) & enable SSH/Wi-Fi in Rasbperi Pi Imager.
-ssh pi@raspberrypi.local
+# 0 Flash Raspberry Pi OS Lite (64-bit) via Rasbperi Pi Imager
+# 0.1 - set hostname to opendartboard
+# 0.2 - enable SSH
+# 0.3 - setup Wi-Fi SSID and password
+# 0.4 boot and connect to pi via SSH:
+ssh pi@opendartboard.local
 
 # 1 On the Pi: install from package
 curl -sSL https://github.com/OpenDartboard/OpenDartboard/releases/latest/download/opendartboard_0.1.0-1_armhf.deb -o opendartboard.deb
@@ -77,16 +82,11 @@ docker-compose up -d
 ## 6. Roadmap (MVP 1.0)
 
 - Camera auto-calibration
-- Tip detection
-- WebSocket api
-- ASCII HDMI output
+- Tip detection & scorring
+- WebSocket API & ASCII HDMI output
 - Configurations/options
 
 ## 7. Contributing
 
 Pull requests are welcome!
-Please file an issue first if you plan major changes — we’ll discuss approach & design.
-
-## 8. License
-
-MIT License
+Please file an issue first — we’ll discuss approach & design.

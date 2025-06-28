@@ -1,7 +1,5 @@
 #include "ellipse_processing.hpp"
 #include <iostream>
-#include <random>
-#include <algorithm>
 #include <cmath>
 
 using namespace cv;
@@ -9,240 +7,489 @@ using namespace std;
 
 namespace ellipse_processing
 {
-    // MVP Step 1: Use the clean mask directly (skip contour processing)
-    bool findBoundaryPoints(
-        const Mat &cleanMask, // CHANGED: Use clean mask directly
-        const Point &center,
-        bool debug_mode,
-        vector<Point> &boundaryPoints,
-        vector<bool> &rayWasInterpolated,
-        vector<bool> &finalRayStatus,
-        const EllipseParams &params)
+    // Rolling baseline ring width validation
+    vector<Point> performDoubleRayTrace(const Mat &preprocessedMask, const Point &bullCenter, const EllipseParams &params,
+                                        vector<Point> &allInnerPoints, vector<Point> &allOuterPoints, vector<bool> &rayValidFlags)
     {
+        vector<double> ringWidths;
+        allInnerPoints.clear();
+        allOuterPoints.clear();
+        rayValidFlags.clear();
 
-        boundaryPoints.clear();
+        cout << "DEBUG: Starting double ray trace from (" << bullCenter.x << "," << bullCenter.y << ")" << endl;
 
-        cout << "DEBUG: Starting Step 1 - Using Clean Mask from Color Processing" << endl;
-        cout << "DEBUG: Clean mask size: " << cleanMask.cols << "x" << cleanMask.rows
-             << ", center=(" << center.x << "," << center.y << ")" << endl;
-
-        // Check if we have enough content
-        int whitePixels = countNonZero(cleanMask);
-
-        if (whitePixels < params.minWhitePixelsThreshold)
+        // PHASE 1: Cast all rays and measure inner/outer boundaries + ring widths
+        for (double angle = 0; angle < 360; angle += params.angleStepDegrees)
         {
-            cout << "DEBUG: Not enough dartboard content in clean mask" << endl;
-            return false;
-        }
+            double radians = angle * CV_PI / 180.0;
+            Point2f direction(cos(radians), sin(radians));
 
-        // Save debug mask to compare with our previous attempts
-        static int mask_counter = 0;
-        cout << "DEBUG: Step 2 - Ray casting on this clean mask" << endl;
+            // Find INNER boundary (first white pixel)
+            Point innerBoundary = bullCenter;
+            bool foundInner = false;
 
-        // TODO: Step 2 - Ray casting will go here
-        // TODO: Step 3 - Filtering will go here
-
-        return true; // For now, just indicate we have a good mask
-    }
-
-    bool fitEllipseToBoundary(
-        const vector<Point> &boundaryPoints,
-        RotatedRect &ellipse,
-        const EllipseParams &params,
-        const Point &center) // FIXED: Add center parameter here too
-    {
-        if (boundaryPoints.size() < 5) // Need at least 5 points for ellipse
-            return false;
-
-        try
-        {
-            ellipse = fitEllipse(boundaryPoints);
-            return true;
-        }
-        catch (const cv::Exception &e)
-        {
-            cout << "DEBUG: Ellipse fitting failed: " << e.what() << endl;
-            return false;
-        }
-    }
-
-    // Visualization function with correct vector handling
-    Mat createDetailedRayVisualization(
-        const Mat &originalFrame,
-        const Point &center,
-        const vector<Point> &allRayPoints,
-        const vector<bool> &rayValid,
-        const vector<bool> &rayWasInterpolated,
-        const RotatedRect &ellipse,
-        const EllipseParams &params)
-    {
-        Mat visualization = originalFrame.clone();
-
-        // Draw the center with clear marking
-        circle(visualization, center, 8, Scalar(255, 255, 255), -1);
-        circle(visualization, center, 3, Scalar(0, 0, 0), -1);
-
-        cout << "DEBUG: Visualization - allRayPoints.size()=" << allRayPoints.size()
-             << ", rayValid.size()=" << rayValid.size()
-             << ", rayWasInterpolated.size()=" << rayWasInterpolated.size() << endl;
-
-        // Draw rays based on actual boundary points found
-        for (size_t i = 0; i < allRayPoints.size(); i++)
-        {
-            Point rayEnd = allRayPoints[i];
-            Scalar rayColor, pointColor;
-            int thickness = 2;
-
-            // FIXED: Check bounds before accessing vectors
-            bool wasInterpolated = (i < rayWasInterpolated.size()) ? rayWasInterpolated[i] : false;
-            bool isValid = (i < rayValid.size()) ? rayValid[i] : true; // Default to valid for actual found points
-
-            // Color based on detection status
-            if (wasInterpolated)
+            for (int distance = params.innerRayStartDistance; distance < params.maxRayDistance; distance++)
             {
-                // Interpolated/fallback points - ORANGE
-                rayColor = Scalar(0, 165, 255);   // Orange
-                pointColor = Scalar(0, 255, 255); // Yellow
-                thickness = 1;
+                Point checkPoint = bullCenter + Point(direction.x * distance, direction.y * distance);
+
+                if (checkPoint.x < 0 || checkPoint.x >= preprocessedMask.cols ||
+                    checkPoint.y < 0 || checkPoint.y >= preprocessedMask.rows)
+                    break;
+
+                if (preprocessedMask.at<uchar>(checkPoint) > 0)
+                {
+                    innerBoundary = checkPoint;
+                    foundInner = true;
+                    break;
+                }
             }
-            else if (isValid)
+
+            // Find OUTER boundary (last white pixel before sustained black)
+            Point outerBoundary = bullCenter;
+            bool foundOuter = false;
+
+            if (foundInner)
             {
-                // Actually detected boundary points - GREEN
-                rayColor = Scalar(0, 255, 0);   // Green
-                pointColor = Scalar(0, 200, 0); // Darker green
-                thickness = 3;
+                Point lastWhitePixel = innerBoundary;
+                int consecutiveBlackCount = 0;
+                const int minConsecutiveBlack = 5;
+
+                for (int distance = norm(innerBoundary - bullCenter); distance < params.maxRayDistance; distance++)
+                {
+                    Point checkPoint = bullCenter + Point(direction.x * distance, direction.y * distance);
+
+                    if (checkPoint.x < 0 || checkPoint.x >= preprocessedMask.cols ||
+                        checkPoint.y < 0 || checkPoint.y >= preprocessedMask.rows)
+                    {
+                        if (lastWhitePixel != innerBoundary)
+                        {
+                            outerBoundary = lastWhitePixel;
+                            foundOuter = true;
+                        }
+                        break;
+                    }
+
+                    bool isWhite = (preprocessedMask.at<uchar>(checkPoint) > 0);
+
+                    if (isWhite)
+                    {
+                        lastWhitePixel = checkPoint;
+                        consecutiveBlackCount = 0;
+                    }
+                    else
+                    {
+                        consecutiveBlackCount++;
+                        if (consecutiveBlackCount >= minConsecutiveBlack && lastWhitePixel != innerBoundary)
+                        {
+                            outerBoundary = lastWhitePixel;
+                            foundOuter = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Calculate ring width
+            bool validRay = foundInner && foundOuter;
+            double ringWidth = validRay ? norm(outerBoundary - innerBoundary) : -1;
+
+            // Store all data
+            allInnerPoints.push_back(innerBoundary);
+            allOuterPoints.push_back(outerBoundary);
+            rayValidFlags.push_back(validRay);
+
+            if (validRay)
+            {
+                ringWidths.push_back(ringWidth);
             }
             else
             {
-                // Invalid/rejected points - RED
-                rayColor = Scalar(0, 0, 255);   // Red
-                pointColor = Scalar(0, 0, 200); // Dark red
-                thickness = 1;
+                ringWidths.push_back(-1);
+            }
+        }
+
+        cout << "DEBUG: Double ray trace completed. Found " << count(rayValidFlags.begin(), rayValidFlags.end(), true) << " valid rays" << endl;
+
+        // PHASE 2: Rolling baseline validation
+        vector<Point> validatedOuterPoints;
+        vector<bool> finalValidFlags(rayValidFlags.size(), false);
+
+        if (count(rayValidFlags.begin(), rayValidFlags.end(), true) >= params.minValidRingMeasurements)
+        {
+
+            // Create rolling baseline of ring widths
+            vector<double> rollingBaseline;
+            vector<double> validRingWidths;
+
+            // Collect all valid ring widths
+            for (size_t i = 0; i < rayValidFlags.size(); i++)
+            {
+                if (rayValidFlags[i] && ringWidths[i] > 0)
+                {
+                    validRingWidths.push_back(ringWidths[i]);
+                }
             }
 
-            // Draw ray line and point
-            line(visualization, center, rayEnd, rayColor, thickness);
-            circle(visualization, rayEnd, params.pointRadius + 1, pointColor, -1);
+            if (validRingWidths.size() < params.minValidRingMeasurements)
+            {
+                cout << "DEBUG: Not enough valid ring widths for rolling baseline" << endl;
+                return vector<Point>();
+            }
+
+            // Calculate global statistics for outlier detection
+            sort(validRingWidths.begin(), validRingWidths.end());
+            double globalMedian = validRingWidths[validRingWidths.size() / 2];
+
+            // Calculate standard deviation
+            double sum = 0;
+            for (double width : validRingWidths)
+            {
+                sum += (width - globalMedian) * (width - globalMedian);
+            }
+            double stdDev = sqrt(sum / validRingWidths.size());
+
+            cout << "DEBUG: Global ring width stats - median: " << globalMedian
+                 << ", stdDev: " << stdDev << endl;
+
+            // Rolling validation - go around the circle
+            double rollingExpected = globalMedian; // Start with global median
+            int validCount = 0;
+
+            for (size_t i = 0; i < rayValidFlags.size(); i++)
+            {
+                if (!rayValidFlags[i] || ringWidths[i] <= 0)
+                    continue;
+
+                double currentWidth = ringWidths[i];
+                double angle = i * params.angleStepDegrees;
+
+                // Check against rolling expected value
+                double deviation = abs(currentWidth - rollingExpected);
+                double stdDeviation = abs(currentWidth - globalMedian) / stdDev;
+
+                bool passesJumpTest = (deviation <= params.maxRingWidthJump);
+                bool passesOutlierTest = (stdDeviation <= params.ringWidthOutlierThreshold);
+
+                // temporary removed to not clutter the output
+                // cout << "DEBUG: Ray " << angle << "° - width=" << currentWidth
+                //      << ", expected=" << rollingExpected << ", deviation=" << deviation
+                //      << ", stdDev=" << stdDeviation << " - ";
+
+                if (passesJumpTest && passesOutlierTest)
+                {
+                    // ACCEPT this ray
+                    validatedOuterPoints.push_back(allOuterPoints[i]);
+                    finalValidFlags[i] = true;
+                    validCount++;
+
+                    // Update rolling expected (smooth transition)
+                    double alpha = 0.3; // Smoothing factor
+                    rollingExpected = alpha * currentWidth + (1.0 - alpha) * rollingExpected;
+
+                    // temporary removed to not clutter the output
+                    // cout << "ACCEPTED (newExpected=" << rollingExpected << ")" << endl;
+                }
+                else
+                {
+                    // temporary removed to not clutter the output
+                    // cout << "REJECTED (jump=" << !passesJumpTest
+                    //      << ", outlier=" << !passesOutlierTest << ")" << endl;
+                }
+            }
+
+            // Update rayValidFlags to reflect final validation
+            rayValidFlags = finalValidFlags;
+
+            cout << "DEBUG: Rolling baseline validation result: " << validatedOuterPoints.size()
+                 << " validated rays from " << allOuterPoints.size() << " total rays" << endl;
+
+            return validatedOuterPoints;
         }
 
-        // Draw the fitted ellipse if valid
-        if (ellipse.size.width > 0 && ellipse.size.height > 0)
+        cout << "DEBUG: Insufficient ring width measurements, using all valid rays" << endl;
+        vector<Point> allValidOuterPoints;
+        for (size_t i = 0; i < rayValidFlags.size(); i++)
         {
-            cv::ellipse(visualization, ellipse, params.ellipseColor, params.ellipseThickness);
-
-            // ENHANCED: Draw ellipse info
-            double area = M_PI * (ellipse.size.width / 2.0) * (ellipse.size.height / 2.0);
-            cout << "DEBUG: Drawing ellipse - area=" << area << ", width=" << ellipse.size.width
-                 << ", height=" << ellipse.size.height << endl;
+            if (rayValidFlags[i])
+            {
+                allValidOuterPoints.push_back(allOuterPoints[i]);
+            }
         }
-
-        // Enhanced info text with actual values
-        putText(visualization, "Points: " + to_string(allRayPoints.size()) + " found",
-                Point(10, 30), FONT_HERSHEY_SIMPLEX, 0.7, Scalar(255, 255, 255), 2);
-
-        if (ellipse.size.width > 0)
-        {
-            double aspectRatio = max(ellipse.size.width, ellipse.size.height) /
-                                 min(ellipse.size.width, ellipse.size.height);
-            double area = M_PI * (ellipse.size.width / 2.0) * (ellipse.size.height / 2.0);
-
-            putText(visualization,
-                    "Ellipse: " + to_string(int(ellipse.size.width / 2)) + "x" + to_string(int(ellipse.size.height / 2)) +
-                        " ratio=" + to_string(aspectRatio).substr(0, 4),
-                    Point(10, 60), FONT_HERSHEY_SIMPLEX, 0.7, Scalar(255, 255, 255), 2);
-
-            putText(visualization,
-                    "Area: " + to_string(int(area)) + " pixels",
-                    Point(10, 90), FONT_HERSHEY_SIMPLEX, 0.7, Scalar(255, 255, 255), 2);
-        }
-        else
-        {
-            putText(visualization, "ELLIPSE FITTING FAILED",
-                    Point(10, 60), FONT_HERSHEY_SIMPLEX, 0.7, Scalar(0, 0, 255), 2);
-        }
-
-        putText(visualization, "Green=Detected, Orange=Fallback, Red=Rejected",
-                Point(10, 120), FONT_HERSHEY_SIMPLEX, 0.6, Scalar(255, 255, 255), 2);
-
-        return visualization;
+        return allValidOuterPoints;
     }
 
-    // Main function to process the ellipse - CLEAN RETURN
-    RotatedRect processEllipse(
-        const vector<vector<Point>> &contours,
+    // UPDATED: Main function uses MaskBundle and proper terminology
+    EllipseBoundaryData processEllipse(
         const Mat &originalFrame,
-        const Mat &cleanMask,
+        const mask_processing::MaskBundle &masks,
         const Point &bullCenter,
         const Point &frameCenter,
         int camera_idx,
         bool debug_mode,
         const EllipseParams &params)
     {
-        vector<Point> allRayPoints;
-        vector<bool> rayWasInterpolated;
-        vector<bool> actualRayStatus;
-        Mat ellipseVisualization;
+        cout << "DEBUG: Ellipse processing camera " << camera_idx << " starting..." << endl;
+        EllipseBoundaryData result;
 
-        // Use the clean mask directly instead of processing contours
-        bool boundaryFound = findBoundaryPoints(cleanMask, bullCenter, debug_mode, allRayPoints, rayWasInterpolated, actualRayStatus, params);
-
-        RotatedRect dartboardEllipse;
-        bool success = false;
-
-        if (boundaryFound && allRayPoints.size() >= 5)
+        // SECTION 1: RAY TRACING for DOUBLES (most accurate method)
+        if (!masks.doublesMask.empty())
         {
+            cout << "DEBUG: Processing doubles ring with ray tracing..." << endl;
+
+            // No preprocessing needed - mask is already clean!
+            int whitePixels = countNonZero(masks.doublesMask);
+            cout << "DEBUG: Doubles mask has " << whitePixels << " white pixels" << endl;
+
+            vector<Point> allInnerPoints, allOuterPoints;
+            vector<bool> rayValidFlags;
+            vector<Point> finalBoundaryPoints;
+
+            if (whitePixels >= params.minWhitePixelsThreshold)
+            {
+                // Perform ray tracing on clean doubles mask
+                finalBoundaryPoints = performDoubleRayTrace(masks.doublesMask, bullCenter, params,
+                                                            allInnerPoints, allOuterPoints, rayValidFlags);
+
+                if (finalBoundaryPoints.size() >= params.minValidRays)
+                {
+                    try
+                    {
+                        // Fit ellipse to validated outer boundary points
+                        result.outerDoubleEllipse = fitEllipse(finalBoundaryPoints);
+                        result.validOuterPoints = finalBoundaryPoints.size();
+                        cout << "DEBUG: SUCCESS - Fitted outer double ellipse from " << result.validOuterPoints << " boundary points" << endl;
+
+                        // Fit ellipse to inner boundary points (validated ones only)
+                        vector<Point> validatedInnerPoints;
+                        set<pair<int, int>> acceptedOuterPoints;
+                        for (const Point &pt : finalBoundaryPoints)
+                        {
+                            acceptedOuterPoints.insert({pt.x, pt.y});
+                        }
+
+                        for (size_t i = 0; i < allOuterPoints.size(); i++)
+                        {
+                            if (acceptedOuterPoints.count({allOuterPoints[i].x, allOuterPoints[i].y}) > 0 &&
+                                i < allInnerPoints.size())
+                            {
+                                validatedInnerPoints.push_back(allInnerPoints[i]);
+                            }
+                        }
+
+                        if (validatedInnerPoints.size() >= 5)
+                        {
+                            result.innerDoubleEllipse = fitEllipse(validatedInnerPoints);
+                            result.validInnerPoints = validatedInnerPoints.size();
+                            cout << "DEBUG: SUCCESS - Fitted inner double ellipse from " << result.validInnerPoints << " inner points" << endl;
+                        }
+                        else
+                        {
+                            // Fallback: scale outer ellipse for inner boundary
+                            result.innerDoubleEllipse = result.outerDoubleEllipse;
+                            result.innerDoubleEllipse.size.width *= 0.92;
+                            result.innerDoubleEllipse.size.height *= 0.92;
+                            result.validInnerPoints = 0;
+                            cout << "DEBUG: FALLBACK - Calculated inner double ellipse from outer" << endl;
+                        }
+
+                        result.hasValidDoubles = true;
+                    }
+                    catch (const cv::Exception &e)
+                    {
+                        cout << "DEBUG: Double ellipse fitting failed: " << e.what() << endl;
+                        result.hasValidDoubles = false;
+                    }
+                }
+                else
+                {
+                    cout << "DEBUG: Not enough boundary points for doubles: " << finalBoundaryPoints.size() << endl;
+                    result.hasValidDoubles = false;
+                }
+            }
+        }
+
+        // SECTION 2: CONTOUR FITTING for TRIPLES (efficient method)
+        if (!masks.triplesMask.empty())
+        {
+            cout << "DEBUG: Processing triples ring with contour fitting..." << endl;
+
+            // Find ALL contours
+            vector<vector<Point>> allTriplesContours;
+            findContours(masks.triplesMask, allTriplesContours, RETR_LIST, CHAIN_APPROX_SIMPLE);
+
+            cout << "DEBUG: Found " << allTriplesContours.size() << " total contours" << endl;
+
+            // Sort by area (largest first)
+            sort(allTriplesContours.begin(), allTriplesContours.end(),
+                 [](const vector<Point> &a, const vector<Point> &b)
+                 {
+                     return contourArea(a) > contourArea(b);
+                 });
+
+            // Debug contour areas
+            for (size_t i = 0; i < allTriplesContours.size(); i++)
+            {
+                cout << "DEBUG: Contour " << i << " area: " << contourArea(allTriplesContours[i]) << endl;
+            }
+
             try
             {
-                dartboardEllipse = fitEllipse(allRayPoints);
-                cout << "DEBUG: Fitted ellipse - center=(" << dartboardEllipse.center.x << ", " << dartboardEllipse.center.y
-                     << "), size=(" << dartboardEllipse.size.width << ", " << dartboardEllipse.size.height
-                     << "), angle=" << dartboardEllipse.angle << endl;
-                success = true;
+                // Fit outer ellipse to largest contour
+                if (allTriplesContours.size() >= 1 && allTriplesContours[0].size() >= 5)
+                {
+                    result.outerTripleEllipse = fitEllipse(allTriplesContours[0]);
+                    cout << "DEBUG: SUCCESS - Fitted outer triple ellipse from largest contour (area: " << contourArea(allTriplesContours[0]) << ")" << endl;
+                }
+
+                // Find a DIFFERENT contour for inner (skip the one we just used)
+                bool foundInner = false;
+                for (size_t i = 1; i < allTriplesContours.size(); i++)
+                {
+                    if (allTriplesContours[i].size() >= 5)
+                    {
+                        double areaRatio = contourArea(allTriplesContours[i]) / contourArea(allTriplesContours[0]);
+                        cout << "DEBUG: Checking contour " << i << " - area ratio: " << areaRatio << endl;
+
+                        // Only use if it's significantly different in size (not the same contour)
+                        if (areaRatio < 0.9) // At least 10% smaller
+                        {
+                            result.innerTripleEllipse = fitEllipse(allTriplesContours[i]);
+                            cout << "DEBUG: SUCCESS - Fitted inner triple ellipse from contour " << i << " (area: " << contourArea(allTriplesContours[i]) << ")" << endl;
+                            foundInner = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (!foundInner)
+                {
+                    cout << "DEBUG: FAILED - No suitable inner contour found, all contours too similar" << endl;
+                }
+
+                result.hasValidTriples = (result.outerTripleEllipse.size.area() > 0 && result.innerTripleEllipse.size.area() > 0);
             }
             catch (const cv::Exception &e)
             {
-                cout << "DEBUG: Ellipse fitting failed: " << e.what() << endl;
-                success = false;
+                cout << "DEBUG: FAIL - Triple ellipse fitting failed: " << e.what() << endl;
+                result.hasValidTriples = false;
             }
         }
-        else
+
+        // SECTION 3: CONTOUR FITTING for BULL RINGS (simple method)
+        if (!masks.outerBullMask.empty())
         {
-            cout << "DEBUG: Not enough boundary points found for ellipse fitting: " << allRayPoints.size() << endl;
+            cout << "DEBUG: Processing outer bull (25-point) with contour fitting..." << endl;
+
+            vector<vector<Point>> outerBullContours;
+            findContours(masks.outerBullMask, outerBullContours, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE);
+
+            if (!outerBullContours.empty())
+            {
+                try
+                {
+                    // Sort by area and fit to largest contour
+                    sort(outerBullContours.begin(), outerBullContours.end(),
+                         [](const vector<Point> &a, const vector<Point> &b)
+                         {
+                             return contourArea(a) > contourArea(b);
+                         });
+
+                    if (outerBullContours[0].size() >= 5)
+                    {
+                        result.outerBullEllipse = fitEllipse(outerBullContours[0]);
+                        cout << "DEBUG: SUCCESS - Fitted outer bull ellipse from contour" << endl;
+                    }
+                }
+                catch (const cv::Exception &e)
+                {
+                    cout << "DEBUG: Outer bull ellipse fitting failed: " << e.what() << endl;
+                }
+            }
         }
 
-        // HANDLE FALLBACK INTERNALLY
-        if (!success)
+        // SECTION 3.1: CONTOUR FITTING for INNER BULL RING (50-point)
+        if (!masks.bullMask.empty())
         {
-            cout << "DEBUG: Using fallback ellipse with bull center" << endl;
+            cout << "DEBUG: Processing bullseye (50-point) with contour fitting..." << endl;
 
-            // Estimate dartboard size from frame dimensions
-            int estimatedRadius = min(originalFrame.cols, originalFrame.rows) / 3;
+            vector<vector<Point>> bullContours;
+            findContours(masks.bullMask, bullContours, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE);
 
-            // Create fallback ellipse centered on bull
-            dartboardEllipse.center = Point2f(bullCenter.x, bullCenter.y);
-            dartboardEllipse.size = Size2f(estimatedRadius * 2, estimatedRadius * 2);
-            dartboardEllipse.angle = 0;
+            if (!bullContours.empty())
+            {
+                try
+                {
+                    // Sort by area and fit to largest contour
+                    sort(bullContours.begin(), bullContours.end(),
+                         [](const vector<Point> &a, const vector<Point> &b)
+                         {
+                             return contourArea(a) > contourArea(b);
+                         });
+
+                    if (bullContours[0].size() >= 5)
+                    {
+                        result.innerBullEllipse = fitEllipse(bullContours[0]);
+                        cout << "DEBUG: SUCCESS - Fitted bullseye ellipse from contour" << endl;
+                    }
+                }
+                catch (const cv::Exception &e)
+                {
+                    cout << "DEBUG: Bullseye ellipse fitting failed: " << e.what() << endl;
+                }
+            }
         }
 
+        // Set bull validation flag
+        result.hasValidBulls = (result.outerBullEllipse.size.area() > 0 || result.innerBullEllipse.size.area() > 0);
+
+        // SECTION 4: PERSPECTIVE ANALYSIS (using doubles as reference)
+        if (result.hasValidDoubles)
+        {
+            Point ellipseCenter(result.outerDoubleEllipse.center);
+            result.offsetX = ellipseCenter.x - bullCenter.x;
+            result.offsetY = ellipseCenter.y - bullCenter.y;
+            result.offsetMagnitude = norm(Point2f(result.offsetX, result.offsetY));
+            result.offsetAngle = atan2(result.offsetY, result.offsetX) * 180.0 / CV_PI;
+
+            cout << "DEBUG: Perspective offset - X=" << result.offsetX << ", Y=" << result.offsetY
+                 << ", magnitude=" << result.offsetMagnitude << "px" << endl;
+        }
+
+        // SECTION 5: DEBUG VISUALIZATION
         if (debug_mode)
         {
-            if (success)
+            Mat ellipseVis = originalFrame.clone();
+
+            // Draw all detected ellipses with different colors
+            if (result.hasValidDoubles)
             {
-                cout << "Camera " << camera_idx << ": ELLIPSE SUCCESS - " << allRayPoints.size() << " boundary points found" << endl;
-            }
-            else
-            {
-                cout << "Camera " << camera_idx << ": ELLIPSE FALLBACK - using bull center with estimated size" << endl;
+                ellipse(ellipseVis, result.outerDoubleEllipse, Scalar(255, 0, 255), 3);
+                ellipse(ellipseVis, result.innerDoubleEllipse, Scalar(255, 255, 0), 2);
             }
 
-            // Create visualization
-            ellipseVisualization = createDetailedRayVisualization(originalFrame, bullCenter, allRayPoints, actualRayStatus, rayWasInterpolated, dartboardEllipse, params);
+            if (result.hasValidTriples)
+            {
+                ellipse(ellipseVis, result.outerTripleEllipse, Scalar(255, 0, 255), 2);
+                ellipse(ellipseVis, result.innerTripleEllipse, Scalar(255, 255, 0), 2);
+            }
+
+            if (result.hasValidBulls)
+            {
+                ellipse(ellipseVis, result.outerBullEllipse, Scalar(255, 0, 255), 2);
+                ellipse(ellipseVis, result.innerBullEllipse, Scalar(255, 255, 0), 2);
+            }
+
+            // // Draw bull center
+            // circle(ellipseVis, bullCenter, 8, Scalar(0, 0, 0), -1);
+            // circle(ellipseVis, bullCenter, 10, Scalar(255, 255, 255), 2);
 
             system("mkdir -p debug_frames/ellipse_processing");
-            imwrite("debug_frames/ellipse_processing/ellipse_result_" + to_string(camera_idx) + ".jpg", ellipseVisualization);
+            imwrite("debug_frames/ellipse_processing/ellipse_result_" + to_string(camera_idx) + ".jpg", ellipseVis);
+
+            cout << "DEBUG: Saved ellipse visualization with all ring types" << endl;
         }
 
-        return dartboardEllipse; // CLEAN: Always return a valid ellipse
+        return result;
     }
 
 } // namespace ellipse_processing

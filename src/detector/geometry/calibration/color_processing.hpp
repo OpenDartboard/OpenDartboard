@@ -4,6 +4,7 @@
 #include <string>
 
 using namespace cv;
+using namespace std;
 
 namespace color_processing
 {
@@ -94,17 +95,8 @@ namespace color_processing
     };
 
     // Input: roiFrame → Output: redGreenFrame (with red=bull, green=rings)
-    cv::Mat processColors(
-        const cv::Mat &roiFrame,
-        int camera_idx = 0,
-        bool debug_mode = false,
-        const ColorParams &params = ColorParams());
+    Mat processColors(const Mat &roiFrame, int camera_idx = 0, bool debug_mode = false, const ColorParams &params = ColorParams());
 
-    // OPTIONAL: If we still need individual masks for bull detection
-    void getIndividualColorMasks(
-        const cv::Mat &roiFrame,
-        cv::Mat &redMask,
-        cv::Mat &greenMask,
-        const ColorParams &params = ColorParams());
-
+    // Helper for when individual masks are needed
+    pair<Mat, Mat> getIndividualColorMasks(const Mat &roiFrame, const ColorParams &params = ColorParams());
 }

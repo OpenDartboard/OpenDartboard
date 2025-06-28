@@ -203,7 +203,7 @@ vector<Mat> Scorer::captureAndAverageFrames(int numFrames)
       allFrameSets.push_back(frameSet);
     }
 
-    // FIXED: Use FPS-based delay instead of hardcoded 50ms
+    // Use FPS-based delay instead of hardcoded 50ms
     int frameIntervalMs = 1000 / fps; // Calculate milliseconds per frame
     this_thread::sleep_for(chrono::milliseconds(frameIntervalMs));
   }
