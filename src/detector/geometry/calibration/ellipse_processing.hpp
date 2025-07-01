@@ -76,7 +76,7 @@ namespace ellipse_processing
                                 offsetX(0.0), offsetY(0.0), offsetMagnitude(0.0), offsetAngle(0.0) {}
     };
 
-    // UPDATED: Takes MaskBundle instead of single mask
+    // Takes MaskBundle instead of single mask
     EllipseBoundaryData processEllipse(
         const cv::Mat &originalFrame,
         const mask_processing::MaskBundle &masks,

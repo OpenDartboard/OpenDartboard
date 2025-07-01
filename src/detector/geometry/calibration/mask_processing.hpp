@@ -23,8 +23,8 @@ namespace mask_processing
     {
         Mat fullMask;         // Raw mask before any processing/carving
         Mat doublesMask;      // Doubles ring area (preprocessed for ellipse detection)
-        Mat triplesMask;      // Triples ring area (TODO: implement later)
-        Mat outerBullMask;    // 25-point ring (single bull) (TODO: implement later)
+        Mat triplesMask;      // Triples ring area
+        Mat outerBullMask;    // 25-point ring (single bull)
         Mat bullMask;         // 50-point bullseye (double bull) - carved red area
         bool isValid = false; // Flag if mask generation succeeded
     };

@@ -340,7 +340,7 @@ namespace wire_processing
             imwrite("debug_frames/wire_processing/all_contours_" + to_string(calib.camera_index) + ".jpg", contoursImg);
 
             // DEBUG CODE: START HERE
-            // NEW DEBUG 1: Layered visualization on blue background
+            // Layered visualization on blue background
             Mat layeredDebug = Mat::zeros(mask.size(), CV_8UC3);
 
             // Layer 1: Blue mask (50% transparent)
@@ -371,7 +371,7 @@ namespace wire_processing
 
             imwrite("debug_frames/wire_processing/wire_processing_result_" + to_string(calib.camera_index) + ".jpg", layeredDebug);
 
-            // NEW DEBUG 2: Same layers but on actual frame
+            // Same layers but on actual frame
             Mat frameLayered = mask.clone();
 
             // Layer 1: Blue mask overlay on frame (50% blend)
@@ -548,7 +548,6 @@ namespace wire_processing
         int samples = 0;
 
         // Sample along the line from center to wire
-        // FIX: Changed from dist += .0f to dist += 2.0f
         for (float dist = 10.0f; dist < norm(wire - center); dist += 2.0f)
         {
             Point2f samplePoint = center + direction * dist;
@@ -583,7 +582,7 @@ namespace wire_processing
         return (samples > 0) ? score / samples : 0.0f;
     }
 
-    // NEW: Select average wire position from a group (simpler than scoring!)
+    // Select average wire position from a group (simpler than scoring!)
     Point2f selectAverageWireFromGroup(const vector<Point2f> &group, Point2f center)
     {
         if (group.empty())

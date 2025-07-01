@@ -195,9 +195,9 @@ namespace dartboard_visualization
 
             // Ring detection status
             std::string ringStatus = "Rings: ";
-            ringStatus += calib.ellipses.hasValidDoubles ? "Doubles✓ " : "Doubles✗ ";
-            ringStatus += calib.ellipses.hasValidTriples ? "Triples✓ " : "Triples✗ ";
-            ringStatus += calib.ellipses.hasValidBulls ? "Bulls✓" : "Bulls✗";
+            ringStatus += calib.ellipses.hasValidDoubles ? "Doubles (YES) " : "Doubles(NO) ";
+            ringStatus += calib.ellipses.hasValidTriples ? "Triples(YES) " : "Triples(NO) ";
+            ringStatus += calib.ellipses.hasValidBulls ? "Bulls(YES)" : "Bulls(NO)";
 
             cv::putText(visFrame, ringStatus, cv::Point(20, frame.rows - 40),
                         cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 255, 255), 2);
