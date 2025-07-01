@@ -3,9 +3,9 @@
 **OpenDartboard** is a hobby-friendly, fully FOSS toolkit for building an automatic _steel-tip_ dart–scoring station:
 
 - **Headless Scorer** — Uses a Raspberry Pi Zero 2 W with 3 cameras to detect darts and output scores in standard notation (T20, S5, D12, …) via a easy to consume WebSocket API.
-- **Computer Vision** — Lightweight OpenCV, YOLOv8-nano model with ncnn acceleration to run efficiently on a Pi Zero 2 W.
+- **Computer Vision** — Lightweight OpenCV to run efficiently on a Pi Zero 2 W.
 
-The goal: **drop-in freedom** for home tinkerers who want “Autodarts-style” scoring without closed hardware, subscriptions, or vendor lock-in.
+The goal: **drop-in freedom** for home tinkerers who want “Automatic darts scoring" without closed hardware, subscriptions, or vendor lock-in.
 
 ---
 
@@ -15,9 +15,9 @@ The goal: **drop-in freedom** for home tinkerers who want “Autodarts-style” 
 | --------------- | -------------------------------------------------- | -------- |
 | **Packaging**   | Debian package (.deb) for easy installation        | ✅ works |
 | **Development** | Docker-based dev environment for consistent builds | ✅ works |
-| **MVP**         | Auto-calibration via OpenCV                        | WIP      |
-| **MMR**         | Scoring via YOLOv8-nano,                           | T.B.D    |
-| **Polish**      | improved accuracy & Auto-calibration and           | T.B.D    |
+| **MVP**         | Auto-calibration via OpenCV                        | ✅ works |
+| **MMR**         | Scoring                                            | WIP      |
+| **Polish**      | Improved accuracy & Auto-calibration and CI/CD     | T.B.D    |
 | **Stretch**     | WebSocket API / HDMI ASCII output                  | T.B.D    |
 
 ---
@@ -55,9 +55,10 @@ The goal: **drop-in freedom** for home tinkerers who want “Autodarts-style” 
 # 0.4 boot and connect to pi via SSH:
 ssh pi@opendartboard.local
 
-# 1 On the Pi: install from package
-curl -sSL https://github.com/OpenDartboard/OpenDartboard/releases/latest/download/opendartboard_0.1.0-1_armhf.deb -o opendartboard.deb
-sudo dpkg -i opendartboard.deb
+# 1 Build the package & On the Pi: install from package
+git clone https://github.com/OpenDartboard/OpenDartboard.git
+./build.deb.sh
+sudo apt install ./opendartboard_0.x.0.deb
 
 # 2 Watch the scores
 sudo journalctl -fu opendartboard.service
@@ -71,15 +72,18 @@ sudo journalctl -fu opendartboard.service
 git clone https://github.com/OpenDartboard/OpenDartboard.git
 cd OpenDartboard
 
-# Build with Docker (reproducible environment)
-docker-compose build
-docker-compose up -d
+# run build.deb.sh ONCE to get everything setup
+./build.deb.sh
 
-# Build .deb package
-./make.sh
+# login into you build
+docker run -it --rm -v $PWD:/app opendartboard:latest /bin/bash
+
+# make changes
+# rebuild & rerun (can use mock images)
+cmake -S . -B build -DCMAKE_PREFIX_PATH=/usr/local && cmake --build build -j4 && cp build/opendartboard /usr/local/bin/opendartboard && opendartboard --debug --cams mocks/cam_1.mp4,mocks/cam_2.mp4,mocks/cam_3.mp4 --width 1270 --height 720
 ```
 
-## 6. Roadmap (MVP 1.0)
+## 6. Roadmap (1.0)
 
 - Camera auto-calibration
 - Tip detection & scorring
