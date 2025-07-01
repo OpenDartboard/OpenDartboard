@@ -216,7 +216,7 @@ namespace ellipse_processing
         return allValidOuterPoints;
     }
 
-    // UPDATED: Main function uses MaskBundle and proper terminology
+    // Main function uses MaskBundle and proper terminology
     EllipseBoundaryData processEllipse(
         const Mat &originalFrame,
         const mask_processing::MaskBundle &masks,
