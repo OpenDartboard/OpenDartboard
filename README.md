@@ -16,7 +16,7 @@ The goal: **drop-in freedom** for home tinkerers who want “Automatic darts sco
 | **Packaging**   | Debian package (.deb) for easy installation        | ✅ works |
 | **Development** | Docker-based dev environment for consistent builds | ✅ works |
 | **MVP**         | Auto-calibration via OpenCV                        | ✅ works |
-| **MMR**         | Scoring                                            | WIP      |
+| **MMR**         | Scoring vai OpenCV (or) YOLOv8-nano /w NCNN        | WIP      |
 | **Polish**      | Improved accuracy & Auto-calibration and CI/CD     | T.B.D    |
 | **Stretch**     | WebSocket API / HDMI ASCII output                  | T.B.D    |
 
@@ -57,7 +57,8 @@ ssh pi@opendartboard.local
 
 # 1 Build the package & On the Pi: install from package
 git clone https://github.com/OpenDartboard/OpenDartboard.git
-./build.deb.sh
+./install.sh
+./make.sh
 sudo apt install ./opendartboard_0.x.0.deb
 
 # 2 Watch the scores
