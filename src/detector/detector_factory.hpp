@@ -1,8 +1,8 @@
 #pragma once
 #include "dart_detector.hpp"
 #include "geometry/geometry_detector.hpp"
+#include "utils.hpp"
 #include <memory>
-#include <iostream>
 
 class DetectorFactory
 {
@@ -12,14 +12,14 @@ public:
     {
         if (use_ai)
         {
-            std::cout << "Loading AI-based dart detector" << std::endl;
+            log_info("Loading AI-based dart detector");
             // Placeholder for AI detector - will add later
-            std::cerr << "AI detection not yet implemented, using geometry detector" << std::endl;
+            log_warning("AI detection not yet implemented, using geometry detector");
             return std::make_unique<GeometryDetector>(debug_mode, target_width, target_height);
         }
         else
         {
-            std::cout << "Loading geometry-based dart detector" << std::endl;
+            log_info("Loading geometry-based dart detector");
             return std::make_unique<GeometryDetector>(debug_mode, target_width, target_height);
         }
     }

@@ -4,7 +4,7 @@
 #include "geometry_detector.hpp"
 #include "geometry_dartboard.hpp"
 #include "calibration/geometry_calibration.hpp"
-#include "../../utils/math.hpp"
+#include "utils.hpp"
 
 using namespace cv;
 using namespace std;
@@ -17,7 +17,7 @@ GeometryDetector::GeometryDetector(bool debug_mode, int target_width, int target
 
 bool GeometryDetector::initialize(const string &config_path)
 {
-    cout << "Initializing geometry detector..." << endl;
+    log_info("Initializing geometry detector...");
     initialized = true;
     calibrated = false;
     return true;
@@ -30,7 +30,7 @@ bool GeometryDetector::initialize(const string &config_path, const vector<cv::Ma
 
     if (!initial_frames.empty())
     {
-        cout << "Performing immediate calibration..." << endl;
+        log_info("Performing immediate calibration...");
 
         // Call calibration method directly instead of using wrapper
         calibrations = geometry_calibration::calibrateMultipleCameras(
@@ -48,11 +48,11 @@ bool GeometryDetector::initialize(const string &config_path, const vector<cv::Ma
             for (const auto &frame : initial_frames)
                 background_frames.push_back(frame.clone());
 
-            cout << "Initial calibration completed successfully" << endl;
+            log_info("Initial calibration completed successfully");
         }
         else
         {
-            cerr << "Initial calibration failed" << endl;
+            log_error("Initial calibration failed");
         }
     }
 
@@ -160,7 +160,7 @@ vector<DartDetection> GeometryDetector::findDarts(const Mat &frame, const Mat &b
         {
             for (const auto &pt : contour)
             {
-                double dist = math::distanceToPoint(pt, calib.center);
+                double dist = math::distanceToPoint(pt, calib.bullCenter);
                 if (dist < min_dist)
                 {
                     min_dist = dist;
@@ -175,7 +175,7 @@ vector<DartDetection> GeometryDetector::findDarts(const Mat &frame, const Mat &b
         // Validate dart candidate
         if (best_point.x >= 0 && closest_calib)
         {
-            double dist_to_center = math::distanceToPoint(best_point, closest_calib->center);
+            double dist_to_center = math::distanceToPoint(best_point, closest_calib->bullCenter);
             if (dist_to_center <= radius * 1.5)
             {
                 // Create detection

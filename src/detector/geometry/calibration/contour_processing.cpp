@@ -1,5 +1,5 @@
 #include "contour_processing.hpp"
-#include <iostream>
+#include "utils.hpp"
 
 using namespace cv;
 using namespace std;
@@ -61,7 +61,7 @@ namespace contour_processing
         // Debug output with optional visualization
         if (debug_mode)
         {
-            cout << "DEBUG: Found " << filteredContours.size() << " contours for camera " << camera_idx << endl;
+            log_debug("Found " + log_string(filteredContours.size()) + " contours for camera " + log_string(camera_idx));
 
             // Create and save visualization
             Mat contourVis = visualizeContours(originalFrame, filteredContours, params);

@@ -286,7 +286,7 @@ namespace color_processing
             imwrite("debug_frames/color_processing/red_green_frame_" + to_string(camera_idx) + ".jpg", redGreenFrame);
         }
 
-        return redGreenFrame; // CLEAN: Return colored frame directly!
+        return redGreenFrame; // Return colored frame directly!
     }
 
     // Helper for when individual masks are needed
