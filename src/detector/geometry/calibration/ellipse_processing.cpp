@@ -1,5 +1,5 @@
 #include "ellipse_processing.hpp"
-#include <iostream>
+#include "utils.hpp"
 #include <cmath>
 
 using namespace cv;
@@ -16,7 +16,7 @@ namespace ellipse_processing
         allOuterPoints.clear();
         rayValidFlags.clear();
 
-        cout << "DEBUG: Starting double ray trace from (" << bullCenter.x << "," << bullCenter.y << ")" << endl;
+        log_debug("Starting double ray trace from (" + log_string(bullCenter.x) + "," + log_string(bullCenter.y) + ")");
 
         // PHASE 1: Cast all rays and measure inner/outer boundaries + ring widths
         for (double angle = 0; angle < 360; angle += params.angleStepDegrees)
@@ -108,7 +108,7 @@ namespace ellipse_processing
             }
         }
 
-        cout << "DEBUG: Double ray trace completed. Found " << count(rayValidFlags.begin(), rayValidFlags.end(), true) << " valid rays" << endl;
+        log_debug("Double ray trace completed. Found " + log_string(count(rayValidFlags.begin(), rayValidFlags.end(), true)) + " valid rays");
 
         // PHASE 2: Rolling baseline validation
         vector<Point> validatedOuterPoints;
@@ -132,7 +132,7 @@ namespace ellipse_processing
 
             if (validRingWidths.size() < params.minValidRingMeasurements)
             {
-                cout << "DEBUG: Not enough valid ring widths for rolling baseline" << endl;
+                log_debug("Not enough valid ring widths for rolling baseline");
                 return vector<Point>();
             }
 
@@ -148,8 +148,7 @@ namespace ellipse_processing
             }
             double stdDev = sqrt(sum / validRingWidths.size());
 
-            cout << "DEBUG: Global ring width stats - median: " << globalMedian
-                 << ", stdDev: " << stdDev << endl;
+            log_debug("Global ring width stats - median: " + log_string(globalMedian) + ", stdDev: " + log_string(stdDev));
 
             // Rolling validation - go around the circle
             double rollingExpected = globalMedian; // Start with global median
@@ -200,13 +199,12 @@ namespace ellipse_processing
             // Update rayValidFlags to reflect final validation
             rayValidFlags = finalValidFlags;
 
-            cout << "DEBUG: Rolling baseline validation result: " << validatedOuterPoints.size()
-                 << " validated rays from " << allOuterPoints.size() << " total rays" << endl;
+            log_debug("Rolling baseline validation result: " + log_string(validatedOuterPoints.size()) + " validated rays from " + log_string(allOuterPoints.size()) + " total rays");
 
             return validatedOuterPoints;
         }
 
-        cout << "DEBUG: Insufficient ring width measurements, using all valid rays" << endl;
+        log_debug("Insufficient ring width measurements, using all valid rays");
         vector<Point> allValidOuterPoints;
         for (size_t i = 0; i < rayValidFlags.size(); i++)
         {
@@ -228,17 +226,17 @@ namespace ellipse_processing
         bool debug_mode,
         const EllipseParams &params)
     {
-        cout << "DEBUG: Ellipse processing camera " << camera_idx << " starting..." << endl;
+        log_debug("Ellipse processing camera " + log_string(camera_idx) + " starting...");
         EllipseBoundaryData result;
 
         // SECTION 1: RAY TRACING for DOUBLES (most accurate method)
         if (!masks.doublesMask.empty())
         {
-            cout << "DEBUG: Processing doubles ring with ray tracing..." << endl;
+            log_debug("Processing doubles ring with ray tracing...");
 
             // No preprocessing needed - mask is already clean!
             int whitePixels = countNonZero(masks.doublesMask);
-            cout << "DEBUG: Doubles mask has " << whitePixels << " white pixels" << endl;
+            log_debug("Doubles mask has " + log_string(whitePixels) + " white pixels");
 
             vector<Point> allInnerPoints, allOuterPoints;
             vector<bool> rayValidFlags;
@@ -257,7 +255,7 @@ namespace ellipse_processing
                         // Fit ellipse to validated outer boundary points
                         result.outerDoubleEllipse = fitEllipse(finalBoundaryPoints);
                         result.validOuterPoints = finalBoundaryPoints.size();
-                        cout << "DEBUG: SUCCESS - Fitted outer double ellipse from " << result.validOuterPoints << " boundary points" << endl;
+                        log_debug("SUCCESS - Fitted outer double ellipse from " + log_string(result.validOuterPoints) + " boundary points");
 
                         // Fit ellipse to inner boundary points (validated ones only)
                         vector<Point> validatedInnerPoints;
@@ -280,7 +278,7 @@ namespace ellipse_processing
                         {
                             result.innerDoubleEllipse = fitEllipse(validatedInnerPoints);
                             result.validInnerPoints = validatedInnerPoints.size();
-                            cout << "DEBUG: SUCCESS - Fitted inner double ellipse from " << result.validInnerPoints << " inner points" << endl;
+                            log_debug("SUCCESS - Fitted inner double ellipse from " + log_string(result.validInnerPoints) + " inner points");
                         }
                         else
                         {
@@ -289,20 +287,20 @@ namespace ellipse_processing
                             result.innerDoubleEllipse.size.width *= 0.92;
                             result.innerDoubleEllipse.size.height *= 0.92;
                             result.validInnerPoints = 0;
-                            cout << "DEBUG: FALLBACK - Calculated inner double ellipse from outer" << endl;
+                            log_debug("FALLBACK - Calculated inner double ellipse from outer");
                         }
 
                         result.hasValidDoubles = true;
                     }
                     catch (const cv::Exception &e)
                     {
-                        cout << "DEBUG: Double ellipse fitting failed: " << e.what() << endl;
+                        log_debug("Double ellipse fitting failed: " + string(e.what()));
                         result.hasValidDoubles = false;
                     }
                 }
                 else
                 {
-                    cout << "DEBUG: Not enough boundary points for doubles: " << finalBoundaryPoints.size() << endl;
+                    log_debug("Not enough boundary points for doubles: " + log_string(finalBoundaryPoints.size()));
                     result.hasValidDoubles = false;
                 }
             }
@@ -311,13 +309,13 @@ namespace ellipse_processing
         // SECTION 2: CONTOUR FITTING for TRIPLES (efficient method)
         if (!masks.triplesMask.empty())
         {
-            cout << "DEBUG: Processing triples ring with contour fitting..." << endl;
+            log_debug("Processing triples ring with contour fitting...");
 
             // Find ALL contours
             vector<vector<Point>> allTriplesContours;
             findContours(masks.triplesMask, allTriplesContours, RETR_LIST, CHAIN_APPROX_SIMPLE);
 
-            cout << "DEBUG: Found " << allTriplesContours.size() << " total contours" << endl;
+            log_debug("Found " + log_string(allTriplesContours.size()) + " total contours");
 
             // Sort by area (largest first)
             sort(allTriplesContours.begin(), allTriplesContours.end(),
@@ -329,7 +327,7 @@ namespace ellipse_processing
             // Debug contour areas
             for (size_t i = 0; i < allTriplesContours.size(); i++)
             {
-                cout << "DEBUG: Contour " << i << " area: " << contourArea(allTriplesContours[i]) << endl;
+                log_debug("Contour " + log_string(i) + " area: " + log_string(contourArea(allTriplesContours[i])));
             }
 
             try
@@ -338,7 +336,7 @@ namespace ellipse_processing
                 if (allTriplesContours.size() >= 1 && allTriplesContours[0].size() >= 5)
                 {
                     result.outerTripleEllipse = fitEllipse(allTriplesContours[0]);
-                    cout << "DEBUG: SUCCESS - Fitted outer triple ellipse from largest contour (area: " << contourArea(allTriplesContours[0]) << ")" << endl;
+                    log_debug("SUCCESS - Fitted outer triple ellipse from largest contour (area: " + log_string(contourArea(allTriplesContours[0])) + ")");
                 }
 
                 // Find a DIFFERENT contour for inner (skip the one we just used)
@@ -348,13 +346,13 @@ namespace ellipse_processing
                     if (allTriplesContours[i].size() >= 5)
                     {
                         double areaRatio = contourArea(allTriplesContours[i]) / contourArea(allTriplesContours[0]);
-                        cout << "DEBUG: Checking contour " << i << " - area ratio: " << areaRatio << endl;
+                        log_debug("Checking contour " + log_string(i) + " - area ratio: " + log_string(areaRatio));
 
                         // Only use if it's significantly different in size (not the same contour)
                         if (areaRatio < 0.9) // At least 10% smaller
                         {
                             result.innerTripleEllipse = fitEllipse(allTriplesContours[i]);
-                            cout << "DEBUG: SUCCESS - Fitted inner triple ellipse from contour " << i << " (area: " << contourArea(allTriplesContours[i]) << ")" << endl;
+                            log_debug("SUCCESS - Fitted inner triple ellipse from contour " + log_string(i) + " (area: " + log_string(contourArea(allTriplesContours[i])) + ")");
                             foundInner = true;
                             break;
                         }
@@ -363,14 +361,14 @@ namespace ellipse_processing
 
                 if (!foundInner)
                 {
-                    cout << "DEBUG: FAILED - No suitable inner contour found, all contours too similar" << endl;
+                    log_debug("FAILED - No suitable inner contour found, all contours too similar");
                 }
 
                 result.hasValidTriples = (result.outerTripleEllipse.size.area() > 0 && result.innerTripleEllipse.size.area() > 0);
             }
             catch (const cv::Exception &e)
             {
-                cout << "DEBUG: FAIL - Triple ellipse fitting failed: " << e.what() << endl;
+                log_debug("FAIL - Triple ellipse fitting failed: " + string(e.what()));
                 result.hasValidTriples = false;
             }
         }
@@ -378,7 +376,7 @@ namespace ellipse_processing
         // SECTION 3: CONTOUR FITTING for BULL RINGS (simple method)
         if (!masks.outerBullMask.empty())
         {
-            cout << "DEBUG: Processing outer bull (25-point) with contour fitting..." << endl;
+            log_debug("Processing outer bull (25-point) with contour fitting...");
 
             vector<vector<Point>> outerBullContours;
             findContours(masks.outerBullMask, outerBullContours, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE);
@@ -397,12 +395,12 @@ namespace ellipse_processing
                     if (outerBullContours[0].size() >= 5)
                     {
                         result.outerBullEllipse = fitEllipse(outerBullContours[0]);
-                        cout << "DEBUG: SUCCESS - Fitted outer bull ellipse from contour" << endl;
+                        log_debug("SUCCESS - Fitted outer bull ellipse from contour");
                     }
                 }
                 catch (const cv::Exception &e)
                 {
-                    cout << "DEBUG: Outer bull ellipse fitting failed: " << e.what() << endl;
+                    log_debug("Outer bull ellipse fitting failed: " + string(e.what()));
                 }
             }
         }
@@ -410,7 +408,7 @@ namespace ellipse_processing
         // SECTION 3.1: CONTOUR FITTING for INNER BULL RING (50-point)
         if (!masks.bullMask.empty())
         {
-            cout << "DEBUG: Processing bullseye (50-point) with contour fitting..." << endl;
+            log_debug("Processing bullseye (50-point) with contour fitting...");
 
             vector<vector<Point>> bullContours;
             findContours(masks.bullMask, bullContours, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE);
@@ -429,12 +427,12 @@ namespace ellipse_processing
                     if (bullContours[0].size() >= 5)
                     {
                         result.innerBullEllipse = fitEllipse(bullContours[0]);
-                        cout << "DEBUG: SUCCESS - Fitted bullseye ellipse from contour" << endl;
+                        log_debug("SUCCESS - Fitted bullseye ellipse from contour");
                     }
                 }
                 catch (const cv::Exception &e)
                 {
-                    cout << "DEBUG: Bullseye ellipse fitting failed: " << e.what() << endl;
+                    log_debug("Bullseye ellipse fitting failed: " + string(e.what()));
                 }
             }
         }
@@ -451,9 +449,11 @@ namespace ellipse_processing
             result.offsetMagnitude = norm(Point2f(result.offsetX, result.offsetY));
             result.offsetAngle = atan2(result.offsetY, result.offsetX) * 180.0 / CV_PI;
 
-            cout << "DEBUG: Perspective offset - X=" << result.offsetX << ", Y=" << result.offsetY
-                 << ", magnitude=" << result.offsetMagnitude << "px" << endl;
+            log_debug("Perspective offset - X=" + log_string(result.offsetX) + ", Y=" + log_string(result.offsetY) + ", magnitude=" + log_string(result.offsetMagnitude) + "px");
         }
+
+        // Set hasDetectedEllipses flag
+        result.hasDetectedEllipses = (result.hasValidDoubles && result.hasValidTriples && result.hasValidBulls);
 
         // SECTION 5: DEBUG VISUALIZATION
         if (debug_mode)
@@ -486,7 +486,7 @@ namespace ellipse_processing
             system("mkdir -p debug_frames/ellipse_processing");
             imwrite("debug_frames/ellipse_processing/ellipse_result_" + to_string(camera_idx) + ".jpg", ellipseVis);
 
-            cout << "DEBUG: Saved ellipse visualization with all ring types" << endl;
+            log_debug("Saved ellipse visualization with all ring types");
         }
 
         return result;

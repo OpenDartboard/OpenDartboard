@@ -29,6 +29,7 @@ pkg_check_modules(GSTREAMER REQUIRED gstreamer-1.0)
 pkg_check_modules(GSTREAMER_APP REQUIRED gstreamer-app-1.0)
 pkg_check_modules(GSTREAMER_BASE REQUIRED gstreamer-base-1.0)
 pkg_check_modules(GSTREAMER_VIDEO REQUIRED gstreamer-video-1.0)
+pkg_check_modules(TESSERACT REQUIRED tesseract)
 
 add_executable(opendartboard
     src/main.cpp
@@ -45,8 +46,11 @@ add_executable(opendartboard
     src/detector/geometry/calibration/bull_processing.cpp
     src/detector/geometry/calibration/mask_processing.cpp
     src/detector/geometry/calibration/wire_processing.cpp
+    src/detector/geometry/calibration/perspective_processing.cpp
+    src/detector/geometry/calibration/orientation_processing.cpp
 )
 
+# Add include directories for easier includes
 target_include_directories(opendartboard PRIVATE
     /usr/local/include
     ${OpenCV_INCLUDE_DIRS}
@@ -55,7 +59,9 @@ target_include_directories(opendartboard PRIVATE
     ${GSTREAMER_APP_INCLUDE_DIRS}
     ${GSTREAMER_BASE_INCLUDE_DIRS}
     ${GSTREAMER_VIDEO_INCLUDE_DIRS}
+    ${TESSERACT_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/utils
     /usr/include/opencv4  # Add explicit path to OpenCV headers
 )
 
@@ -67,6 +73,7 @@ target_link_libraries(opendartboard
         ${GSTREAMER_APP_LIBRARIES}
         ${GSTREAMER_BASE_LIBRARIES}
         ${GSTREAMER_VIDEO_LIBRARIES}
+        ${TESSERACT_LIBRARIES}
         Threads::Threads  # Add pthread linking
 )
 

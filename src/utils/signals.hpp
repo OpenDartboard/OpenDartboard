@@ -1,7 +1,7 @@
 #pragma once
 #include <csignal>
-#include <iostream>
 #include <functional>
+#include "logging.hpp"
 
 namespace signals
 {
@@ -12,7 +12,7 @@ namespace signals
     // Signal handler function
     inline void signalHandler(int signal)
     {
-        std::cout << "Received signal " << signal << ", shutting down..." << std::endl;
+        log_warning("Received signal " + std::to_string(signal) + ", shutting down...");
 
         // Call the registered shutdown callback if it exists
         if (shutdownCallback)
@@ -29,7 +29,7 @@ namespace signals
         shutdownCallback = callback;
         signal(SIGINT, signalHandler);
         signal(SIGTERM, signalHandler);
-        std::cout << "Signal handlers registered for graceful shutdown" << std::endl;
+        log_info("Signal handlers registered for graceful shutdown");
     }
 
 } // namespace signals

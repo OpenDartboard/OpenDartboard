@@ -8,7 +8,8 @@
 #include <algorithm>
 
 // Include the calibration struct
-#include "../calibration/geometry_calibration.hpp"
+#include "geometry_calibration.hpp"
+#include "utils.hpp"
 
 namespace dartboard_visualization
 {
@@ -23,157 +24,132 @@ namespace dartboard_visualization
         }
 
         // Only draw if we have valid calibration
-        if (!calib.hasDetectedEllipses)
+        if (!calib.ellipses.hasValidDoubles)
         {
             // Draw basic info for failed calibration
             cv::putText(visFrame, "CALIBRATION FAILED", cv::Point(20, 40),
                         cv::FONT_HERSHEY_SIMPLEX, 1.2, cv::Scalar(0, 0, 255), 3);
-            cv::circle(visFrame, calib.center, 10, cv::Scalar(0, 0, 255), 3);
+            cv::circle(visFrame, calib.bullCenter, 10, cv::Scalar(0, 0, 255), 3);
             return visFrame;
         }
 
-        // ===== DRAW ALL DETECTED ELLIPSES =====
+        // ===== DRAW DETECTED ELLIPSES =====
+        // Doubles ring (outermost) - THICK CYAN
+        cv::ellipse(visFrame, calib.ellipses.outerDoubleEllipse, cv::Scalar(255, 255, 0), 4);
+        cv::ellipse(visFrame, calib.ellipses.innerDoubleEllipse, cv::Scalar(255, 255, 0), 3);
 
-        // 1. Doubles ring (outermost) - THICK CYAN
-        cv::ellipse(visFrame, calib.doubleOuterRing, cv::Scalar(255, 255, 0), 4); // Cyan outer boundary
-        cv::ellipse(visFrame, calib.doubleInnerRing, cv::Scalar(255, 255, 0), 3); // Cyan inner boundary
+        // Triples ring - THICK GREEN
+        cv::ellipse(visFrame, calib.ellipses.outerTripleEllipse, cv::Scalar(0, 255, 0), 3);
+        cv::ellipse(visFrame, calib.ellipses.innerTripleEllipse, cv::Scalar(0, 255, 0), 3);
 
-        // 2. Triples ring - THICK GREEN
-        cv::ellipse(visFrame, calib.tripleOuterRing, cv::Scalar(0, 255, 0), 3); // Green outer
-        cv::ellipse(visFrame, calib.tripleInnerRing, cv::Scalar(0, 255, 0), 3); // Green inner
+        // Bull rings - THICK RED
+        cv::ellipse(visFrame, calib.ellipses.outerBullEllipse, cv::Scalar(0, 0, 255), 3);
+        cv::ellipse(visFrame, calib.ellipses.innerBullEllipse, cv::Scalar(0, 0, 255), 3);
 
-        // 3. Bull rings - THICK RED
-        cv::ellipse(visFrame, calib.bullOuterRing, cv::Scalar(0, 0, 255), 3); // Red outer bull (25-point)
-        cv::ellipse(visFrame, calib.bullInnerRing, cv::Scalar(0, 0, 255), 3); // Red inner bull (50-point)
-
-        // ===== DRAW DARTBOARD SEGMENTS =====
-
-        std::vector<int> segments = {20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5};
-        float anglePerSegment = 360.0f / 20.0f;
-
-        // EXPERIMENTAL: Add small orientation offset for fine-tuning alignment
-        float orientationOffset = 0.5f; // Try values like -10, -5, 0, +5, +10 degrees
-        float startAngle = calib.orientation + orientationOffset;
-
-        for (int i = 0; i < 20; i++)
+        // ===== DRAW ACTUAL DETECTED WIRES =====
+        if (calib.wires.isValid && !calib.wires.wireEndpoints.empty())
         {
-            float segmentAngle = startAngle + (i * anglePerSegment);
+            log_debug("Drawing " + log_string(calib.wires.wireEndpoints.size()) + " detected wires");
 
-            // EXPERIMENTAL: Try different perspective corrections
-            cv::RotatedRect outerRing = calib.doubleOuterRing;
-            float cx = outerRing.center.x;
-            float cy = outerRing.center.y;
-            float a = outerRing.size.width / 2.0f;
-            float b = outerRing.size.height / 2.0f;
-            float angle_rad = outerRing.angle * CV_PI / 180.0f;
-
-            // Try perspective distortion compensation
-            float radians = segmentAngle * CV_PI / 180.0f;
-            cv::Point2f testDir(cos(radians), sin(radians));
-
-            // Calculate how much this direction is affected by perspective
-            float cos_a = cos(-angle_rad);
-            float sin_a = sin(-angle_rad);
-            float dx_rot = testDir.x * cos_a - testDir.y * sin_a;
-            float dy_rot = testDir.x * sin_a + testDir.y * cos_a;
-
-            // Estimate perspective distortion at this angle
-            float distortionX = abs(dx_rot) * (a / b - 1.0f);
-            float distortionY = abs(dy_rot) * (b / a - 1.0f);
-            float totalDistortion = distortionX + distortionY;
-
-            // Apply correction - experiment with different factors
-            float correctionFactor = totalDistortion * -3.0f;
-            float correctedAngle = segmentAngle + correctionFactor;
-
-            float correctedRadians = correctedAngle * CV_PI / 180.0f;
-            cv::Point2f direction(cos(correctedRadians), sin(correctedRadians));
-
-            // Debug output for first few segments
-            if (i < 3)
+            // Draw each detected wire
+            for (size_t i = 0; i < calib.wires.wireEndpoints.size(); i++)
             {
-                std::cout << "Segment " << i << ": original=" << segmentAngle
-                          << " distortion=" << totalDistortion
-                          << " corrected=" << correctedAngle << std::endl;
-            }
+                cv::Point2f wireEnd = calib.wires.wireEndpoints[i];
 
-            // Calculate intersection with doubles outer ring (REUSE existing variables!)
-            float cos_a2 = cos(-angle_rad);
-            float sin_a2 = sin(-angle_rad);
-            float dx_rot2 = direction.x * cos_a2 - direction.y * sin_a2;
-            float dy_rot2 = direction.x * sin_a2 + direction.y * cos_a2;
-
-            float A = (dx_rot2 * dx_rot2) / (a * a) + (dy_rot2 * dy_rot2) / (b * b);
-            float t = sqrt(1.0f / A);
-
-            cv::Point ellipseEnd = calib.center + cv::Point(direction.x * t * a, direction.y * t * b);
-            cv::Point2f relative(ellipseEnd.x - cx, ellipseEnd.y - cy);
-            cv::Point2f rotated(
-                relative.x * cos(angle_rad) - relative.y * sin(angle_rad),
-                relative.x * sin(angle_rad) + relative.y * cos(angle_rad));
-            cv::Point finalEnd(cx + rotated.x, cy + rotated.y);
-
-            // Calculate ACTUAL ellipse intersection distance for THIS specific segment
-            cv::Point2f rayStart = cv::Point2f(calib.center.x, calib.center.y);
-
-            // Use the CORRECT ray direction from the original math (finalEnd direction)
-            cv::Point2f correctRayDir = cv::Point2f(finalEnd - calib.center);
-            correctRayDir = correctRayDir / cv::norm(correctRayDir); // Normalize
-
-            // Find where this ray actually intersects the ellipse boundary
-            float actualEllipseDistance = 0;
-            for (float dist = 1.0f; dist < 500.0f; dist += 0.5f)
-            {
-                cv::Point2f testPoint = rayStart + correctRayDir * dist;
-                cv::Point2f relative = testPoint - cv::Point2f(cx, cy);
-                cv::Point2f rotated(
-                    relative.x * cos(-angle_rad) - relative.y * sin(-angle_rad),
-                    relative.x * sin(-angle_rad) + relative.y * cos(-angle_rad));
-
-                float ellipseValue = (rotated.x * rotated.x) / (a * a) + (rotated.y * rotated.y) / (b * b);
-                if (ellipseValue >= 1.0f)
+                // Check if this is the wedge 20 wire and draw it thicker
+                if (calib.orientation.wedge20WireIndex >= 0 && i == calib.orientation.wedge20WireIndex)
                 {
-                    actualEllipseDistance = dist;
-                    break;
+                    // Draw wedge 20 wire as thick red line
+                    cv::line(visFrame, calib.bullCenter, wireEnd, cv::Scalar(0, 0, 255), 5);
+                    cv::circle(visFrame, wireEnd, 6, cv::Scalar(0, 0, 255), -1);
+                }
+                else
+                {
+                    // Draw regular wire line from bull center to detected endpoint - BRIGHT YELLOW
+                    cv::line(visFrame, calib.bullCenter, wireEnd, cv::Scalar(0, 255, 255), 2);
+                    cv::circle(visFrame, wireEnd, 3, cv::Scalar(0, 255, 255), -1);
                 }
             }
 
-            // CLAMP to the actual ellipse distance for this segment with 10% padding
-            cv::Point2f lineVector = cv::Point2f(finalEnd - calib.center);
-            float originalDistance = cv::norm(lineVector);
-
-            if (originalDistance > actualEllipseDistance && actualEllipseDistance > 0)
+            // Draw dartboard segment numbers using orientation data
+            if (calib.orientation.wedge20WireIndex >= 0 && calib.wires.wireEndpoints.size() >= 20)
             {
-                // Add 10% padding to the clamped distance
-                float paddedDistance = actualEllipseDistance * 1.10f;
-                cv::Point2f normalizedDirection = lineVector / originalDistance;
-                finalEnd = calib.center + cv::Point(normalizedDirection.x * paddedDistance,
-                                                    normalizedDirection.y * paddedDistance);
+                // Standard dartboard sequence starting from 20
+                std::vector<int> dartboardSequence = {20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5};
+
+                // Draw filled wedge 20 sector first (so it's behind other elements)
+                int wedge20SegmentIndex = 0; // First in sequence
+                int currentWireIndex = (calib.orientation.wedge20WireIndex + wedge20SegmentIndex) % calib.wires.wireEndpoints.size();
+                int nextWireIndex = (currentWireIndex + 1) % calib.wires.wireEndpoints.size();
+
+                cv::Point2f currentWire = calib.wires.wireEndpoints[currentWireIndex];
+                cv::Point2f nextWire = calib.wires.wireEndpoints[nextWireIndex];
+
+                // Create filled triangle for wedge 20
+                std::vector<cv::Point> wedge20Points = {
+                    calib.bullCenter,
+                    cv::Point(currentWire.x, currentWire.y),
+                    cv::Point(nextWire.x, nextWire.y)};
+
+                // Draw filled wedge with transparency
+                cv::Mat overlay = visFrame.clone();
+                cv::fillPoly(overlay, wedge20Points, cv::Scalar(0, 0, 255)); // Red fill
+                cv::addWeighted(visFrame, 0.7, overlay, 0.3, 0, visFrame);   // 30% transparency
+
+                for (int i = 0; i < 20 && i < calib.wires.wireEndpoints.size(); i++)
+                {
+                    // Calculate which wire index corresponds to this dartboard segment
+                    int wireIndex = (calib.orientation.wedge20WireIndex + i) % calib.wires.wireEndpoints.size();
+                    int nextWireIndex = (wireIndex + 1) % calib.wires.wireEndpoints.size();
+
+                    cv::Point2f currentWire = calib.wires.wireEndpoints[wireIndex];
+                    cv::Point2f nextWire = calib.wires.wireEndpoints[nextWireIndex];
+
+                    cv::Point2f currentDir = currentWire - cv::Point2f(calib.bullCenter);
+                    cv::Point2f nextDir = nextWire - cv::Point2f(calib.bullCenter);
+
+                    float currentAngle = atan2(currentDir.y, currentDir.x);
+                    float nextAngle = atan2(nextDir.y, nextDir.x);
+
+                    // Handle angle wraparound
+                    if (nextAngle < currentAngle)
+                    {
+                        nextAngle += 2 * CV_PI;
+                    }
+
+                    // Calculate middle angle between current and next wire
+                    float midAngle = (currentAngle + nextAngle) / 2.0f;
+                    cv::Point2f midDirection(cos(midAngle), sin(midAngle));
+
+                    // Position number at distance from center
+                    float labelDistance = cv::norm(currentDir) * 1.15f; // 15% beyond wire endpoint
+                    cv::Point2f labelPos = cv::Point2f(calib.bullCenter) + midDirection * labelDistance;
+
+                    // Get the correct dartboard number for this segment
+                    int segmentNumber = dartboardSequence[i];
+
+                    // Highlight wedge 20 with different color
+                    cv::Scalar textColor = (segmentNumber == 20) ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 255);
+                    cv::Scalar outlineColor = cv::Scalar(0, 0, 0);
+
+                    // Draw segment number with outline for visibility
+                    cv::putText(visFrame, std::to_string(segmentNumber),
+                                cv::Point(labelPos.x - 8, labelPos.y + 4),
+                                cv::FONT_HERSHEY_SIMPLEX, 0.8, outlineColor, 3); // Black outline
+                    cv::putText(visFrame, std::to_string(segmentNumber),
+                                cv::Point(labelPos.x - 8, labelPos.y + 4),
+                                cv::FONT_HERSHEY_SIMPLEX, 0.8, textColor, 2); // Colored text
+                }
             }
-
-            // Draw segment lines - BRIGHT YELLOW
-            cv::line(visFrame, calib.center, finalEnd, cv::Scalar(0, 255, 255), 2);
-
-            // Position numbers at the END of segment lines with perpendicular offset
-            cv::Point2f lineDirection = cv::Point2f(finalEnd - calib.center);
-            lineDirection = lineDirection / cv::norm(lineDirection); // Normalize
-
-            // Calculate perpendicular vector (rotate 90 degrees)
-            cv::Point2f perpendicular(-lineDirection.y, lineDirection.x);
-
-            // Position at end of line + small outward offset + LARGER perpendicular offset
-            cv::Point2f labelBasePos = cv::Point2f(calib.center) + lineDirection * (cv::norm(cv::Point2f(finalEnd - calib.center)) + 15.0f);
-            cv::Point2f labelPos = labelBasePos + perpendicular * 45.0f; // Increased from 20 to 35
-
-            // Black outline for better visibility
-            cv::putText(visFrame, std::to_string(segments[i]), cv::Point(labelPos.x - 8, labelPos.y + 4),
-                        cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 0), 3); // Black outline
-            cv::putText(visFrame, std::to_string(segments[i]), cv::Point(labelPos.x - 8, labelPos.y + 4),
-                        cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 255, 255), 2); // Yellow text
+        }
+        else
+        {
+            log_warning("No valid wire data to draw");
+            cv::putText(visFrame, "NO WIRE DATA", cv::Point(20, frame.rows - 20),
+                        cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 255), 2);
         }
 
         // ===== CALIBRATION STATUS & INFO =====
-
         if (showDetails)
         {
             // Status banner - GREEN for success
@@ -185,56 +161,70 @@ namespace dartboard_visualization
                         cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(255, 255, 255), 2);
 
             // Bull center coordinates
-            cv::putText(visFrame, "Bull: (" + std::to_string(calib.center.x) + "," + std::to_string(calib.center.y) + ")",
+            cv::putText(visFrame, "Bull: (" + std::to_string(calib.bullCenter.x) + "," + std::to_string(calib.bullCenter.y) + ")",
                         cv::Point(20, 100), cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 255, 255), 2);
 
-            // Perspective info (if there's offset)
-            if (calib.perspectiveOffsetMagnitude > 5)
+            // Wire detection info
+            std::string wireInfo = "Wires: " + std::to_string(calib.wires.wireEndpoints.size()) + "/40 (" + calib.wires.detectionMethod + ")";
+            cv::Scalar wireColor = calib.wires.isValid ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255);
+            cv::putText(visFrame, wireInfo, cv::Point(20, 130),
+                        cv::FONT_HERSHEY_SIMPLEX, 0.6, wireColor, 2);
+
+            // Perspective info
+            if (calib.ellipses.offsetMagnitude > 5)
             {
-                std::string offsetInfo = "Offset: " + std::to_string(int(calib.perspectiveOffsetMagnitude)) + "px";
+                std::string offsetInfo = "Offset: " + std::to_string(int(calib.ellipses.offsetMagnitude)) + "px";
                 cv::Scalar offsetColor = cv::Scalar(0, 255, 255); // Yellow for moderate offset
 
-                if (calib.perspectiveOffsetMagnitude > 50)
+                if (calib.ellipses.offsetMagnitude > 50)
                 {
                     offsetColor = cv::Scalar(0, 165, 255); // Orange for high offset
-                    if (abs(calib.perspectiveOffsetX) > abs(calib.perspectiveOffsetY))
+                    if (abs(calib.ellipses.offsetX) > abs(calib.ellipses.offsetY))
                     {
-                        offsetInfo += (calib.perspectiveOffsetX > 0) ? " (Camera LEFT)" : " (Camera RIGHT)";
+                        offsetInfo += (calib.ellipses.offsetX > 0) ? " (Camera LEFT)" : " (Camera RIGHT)";
                     }
                     else
                     {
-                        offsetInfo += (calib.perspectiveOffsetY > 0) ? " (Camera HIGH)" : " (Camera LOW)";
+                        offsetInfo += (calib.ellipses.offsetY > 0) ? " (Camera HIGH)" : " (Camera LOW)";
                     }
                 }
 
-                cv::putText(visFrame, offsetInfo, cv::Point(20, 130),
+                cv::putText(visFrame, offsetInfo, cv::Point(20, 160),
                             cv::FONT_HERSHEY_SIMPLEX, 0.6, offsetColor, 2);
             }
 
             // Ring detection status
             std::string ringStatus = "Rings: ";
-            ringStatus += "Doubles✓ ";
-            ringStatus += calib.tripleOuterRing.size.area() > 0 ? "Triples✓ " : "Triples✗ ";
-            ringStatus += calib.bullOuterRing.size.area() > 0 ? "Bulls✓" : "Bulls✗";
+            ringStatus += calib.ellipses.hasValidDoubles ? "Doubles✓ " : "Doubles✗ ";
+            ringStatus += calib.ellipses.hasValidTriples ? "Triples✓ " : "Triples✗ ";
+            ringStatus += calib.ellipses.hasValidBulls ? "Bulls✓" : "Bulls✗";
 
             cv::putText(visFrame, ringStatus, cv::Point(20, frame.rows - 40),
                         cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 255, 255), 2);
 
-            // Legend in bottom-right corner
-            int legendY = frame.rows - 120;
-            cv::putText(visFrame, "Legend:", cv::Point(frame.cols - 200, legendY),
+            // Simple legend in bottom-right corner
+            int legendY = frame.rows - 100;
+            cv::putText(visFrame, "Legend:", cv::Point(frame.cols - 180, legendY),
                         cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255, 255, 255), 1);
 
-            cv::line(visFrame, cv::Point(frame.cols - 190, legendY + 20), cv::Point(frame.cols - 170, legendY + 20), cv::Scalar(255, 255, 0), 3);
-            cv::putText(visFrame, "Doubles", cv::Point(frame.cols - 165, legendY + 25),
+            // Doubles
+            cv::line(visFrame, cv::Point(frame.cols - 170, legendY + 20), cv::Point(frame.cols - 150, legendY + 20), cv::Scalar(255, 255, 0), 3);
+            cv::putText(visFrame, "Doubles", cv::Point(frame.cols - 145, legendY + 25),
                         cv::FONT_HERSHEY_SIMPLEX, 0.4, cv::Scalar(255, 255, 255), 1);
 
-            cv::line(visFrame, cv::Point(frame.cols - 190, legendY + 40), cv::Point(frame.cols - 170, legendY + 40), cv::Scalar(0, 255, 0), 3);
-            cv::putText(visFrame, "Triples", cv::Point(frame.cols - 165, legendY + 45),
+            // Triples
+            cv::line(visFrame, cv::Point(frame.cols - 170, legendY + 40), cv::Point(frame.cols - 150, legendY + 40), cv::Scalar(0, 255, 0), 3);
+            cv::putText(visFrame, "Triples", cv::Point(frame.cols - 145, legendY + 45),
                         cv::FONT_HERSHEY_SIMPLEX, 0.4, cv::Scalar(255, 255, 255), 1);
 
-            cv::line(visFrame, cv::Point(frame.cols - 190, legendY + 60), cv::Point(frame.cols - 170, legendY + 60), cv::Scalar(0, 0, 255), 3);
-            cv::putText(visFrame, "Bulls", cv::Point(frame.cols - 165, legendY + 65),
+            // Bulls
+            cv::line(visFrame, cv::Point(frame.cols - 170, legendY + 60), cv::Point(frame.cols - 150, legendY + 60), cv::Scalar(0, 0, 255), 3);
+            cv::putText(visFrame, "Bulls", cv::Point(frame.cols - 145, legendY + 65),
+                        cv::FONT_HERSHEY_SIMPLEX, 0.4, cv::Scalar(255, 255, 255), 1);
+
+            // Wires
+            cv::line(visFrame, cv::Point(frame.cols - 170, legendY + 80), cv::Point(frame.cols - 150, legendY + 80), cv::Scalar(0, 255, 255), 2);
+            cv::putText(visFrame, "Wires", cv::Point(frame.cols - 145, legendY + 85),
                         cv::FONT_HERSHEY_SIMPLEX, 0.4, cv::Scalar(255, 255, 255), 1);
         }
 

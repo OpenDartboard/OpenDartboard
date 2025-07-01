@@ -2,6 +2,7 @@
 #include "utils/args.hpp"
 #include "utils/debug.hpp"
 #include "utils/signals.hpp"
+#include "utils/logging.hpp"
 #include <iostream>
 #include <vector>
 #include <string>
@@ -28,6 +29,19 @@ int main(int argc, char **argv)
   int height = getArg(argc, argv, "--height", 360);
   int fps = getArg(argc, argv, "--fps", 15);
   bool debug_mode = hasFlag(argc, argv, "--debug") || hasFlag(argc, argv, "-d");
+  bool quite_mode = hasFlag(argc, argv, "--quiet") || hasFlag(argc, argv, "-q");
+
+  // set log level based on debug mode
+  if (debug_mode)
+  {
+    logging::setLogLevel(logging::LogLevel::DEBUG); // Show everything
+    log_info("Debug mode enabled - showing all log messages");
+  }
+  else if (quite_mode)
+  {
+    logging::setLogLevel(logging::LogLevel::ERROR); // Only errors
+    log_info("Quiet mode enabled - showing only error messages");
+  }
 
   // Add command-line flag to choose detector
   bool use_ai_detector = hasFlag(argc, argv, "--use-ai");

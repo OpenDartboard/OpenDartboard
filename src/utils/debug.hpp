@@ -4,6 +4,7 @@
 #include <vector>
 #include <map>
 #include <opencv2/opencv.hpp>
+#include "logging.hpp"
 
 namespace debug
 {
@@ -28,9 +29,9 @@ namespace debug
         std::cout << "  - Cameras (" << cams.size() << "):\n";
         for (size_t i = 0; i < cams.size(); i++)
         {
-            std::cout << "      " << (i + 1) << ": " << cams[i] << "\n";
+            std::cout << "      " + std::to_string(i + 1) + ": " + cams[i] << std::endl;
         }
-        std::cout << "-------------------------------------\n";
+        std::cout << "-------------------------------------" << std::endl;
     }
 
     // Print version information and exit
@@ -80,7 +81,7 @@ namespace debug
         {
             system(("mkdir -p " + dir_path).c_str());
             dirs_created[dir_path] = true;
-            std::cout << "Debug mode enabled - saving frames to " << dir_path << "/ directory (1 FPS)" << std::endl;
+            log_debug("Debug mode enabled - saving frames to " + dir_path + "/ directory (1 FPS)");
         }
 
         // Track time to save at ~1 FPS regardless of actual camera FPS
@@ -166,7 +167,9 @@ namespace debug
             // temporarily disabled contour processing
             // "5. Contour Processing",
             "6. Ellipse Processing",
-            "7. Final Calibration"};
+            "7. Wire Processing",
+            "8. Orientation Processing",
+            "9. Final Calibration"};
 
         std::vector<std::string> stepPaths = {
             "roi_processing/roi_frame_",
@@ -176,13 +179,15 @@ namespace debug
             // temporarily disabled contour processing
             // "contour_processing/contours_",
             "ellipse_processing/ellipse_result_",
+            "wire_processing/ensemble_average_result_",
+            "orientation_processing/orientation_result_",
             "geometry_calibration/calibration_camera_"};
 
         // Load first image to get dimensions
         cv::Mat firstImage = cv::imread(baseDir + "/" + stepPaths[0] + "0.jpg");
         if (firstImage.empty())
         {
-            std::cout << "ERROR: Could not load debug images for combined visualization" << std::endl;
+            log_error("Could not load debug images for combined visualization");
             return cv::Mat::zeros(480, 640, CV_8UC3);
         }
 
@@ -253,7 +258,7 @@ namespace debug
                     cv::putText(combinedImage, "Missing Image",
                                 cv::Point(x + 20, y + imgHeight / 2), cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 255, 255), 1);
 
-                    std::cout << "DEBUG: Missing image: " << imagePath << std::endl;
+                    log_warning("Missing image: " + imagePath);
                 }
             }
         }

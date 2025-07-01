@@ -1,6 +1,6 @@
 #include "scorer.hpp"
-#include "utils/debug.hpp"
-#include "detector/detector_factory.hpp" // Added missing include
+#include "utils.hpp"
+#include "detector/detector_factory.hpp"
 #include <iostream>
 #include <thread>
 #include <chrono>
@@ -21,35 +21,35 @@ Scorer::Scorer(const string &model, int w, int h, int fps, const vector<string> 
   detector = DetectorFactory::createDetector(use_ai_detector, debug_display, width, height);
 
   // Capture AVERAGED initial frames to use for calibration (reduces noise)
-  cout << "Capturing and averaging frames for calibration..." << endl;
+  log_info("Capturing and averaging frames for calibration...");
   vector<Mat> initial_frames = captureAndAverageFrames(frameParams.calibrationFrames);
 
   // Allow several attempts to get good calibration frames
   for (int attempt = 0; attempt < frameParams.retryAttempts && initial_frames.empty(); attempt++)
   {
-    cout << "Retrying to capture initial frames, attempt " << attempt + 1 << endl;
+    log_warning("Retrying to capture initial frames, attempt " + log_string(attempt + 1));
     this_thread::sleep_for(chrono::milliseconds(frameParams.retryDelayMs));
     initial_frames = captureAndAverageFrames(frameParams.calibrationFrames);
   }
 
   if (initial_frames.empty())
   {
-    cerr << "Warning: Could not capture initial frames for calibration" << endl;
+    log_warning("Could not capture initial frames for calibration");
 
     // Basic initialization without frames
     if (!detector->initialize(model_path))
     {
-      cerr << "Warning: Failed to initialize detector. Using simulation mode." << endl;
+      log_warning("Failed to initialize detector. Using simulation mode.");
     }
     else
     {
-      cout << "Detector initialized without calibration - will calibrate on first detection" << endl;
+      log_info("Detector initialized without calibration - will calibrate on first detection");
     }
   }
   else
   {
     // Initialize with frames for immediate calibration
-    cout << "Calibrating detector with initial frames..." << endl;
+    log_info("Calibrating detector with initial frames...");
 
     // We need to cast to the specific detector type
     // This is a workaround - normally we'd enhance the interface
@@ -57,11 +57,11 @@ Scorer::Scorer(const string &model, int w, int h, int fps, const vector<string> 
     {
       if (geo_detector->initialize(model_path, initial_frames))
       {
-        cout << "Detector calibrated and initialized successfully" << endl;
+        log_info("Detector calibrated and initialized successfully");
       }
       else
       {
-        cerr << "Warning: Detector initialization with calibration failed" << endl;
+        log_warning("Detector initialization with calibration failed");
       }
     }
     else
@@ -69,11 +69,11 @@ Scorer::Scorer(const string &model, int w, int h, int fps, const vector<string> 
       // Fallback to normal initialization for other detector types
       if (!detector->initialize(model_path))
       {
-        cerr << "Warning: Failed to initialize detector. Using simulation mode." << endl;
+        log_warning("Failed to initialize detector. Using simulation mode.");
       }
       else
       {
-        cout << "Detector initialized successfully" << endl;
+        log_info("Detector initialized successfully");
       }
     }
   }
@@ -113,19 +113,19 @@ bool Scorer::initializeCameras()
 {
   cameras.clear();
 
-  cout << "Initializing " << camera_sources.size() << " cameras..." << endl;
+  log_info("Initializing " + log_string(camera_sources.size()) + " cameras...");
 
   for (size_t i = 0; i < camera_sources.size(); i++)
   {
     VideoCapture cap;
 
     // Try to open the camera
-    cout << "Opening camera " << i + 1 << ": " << camera_sources[i] << endl;
+    log_info("Opening camera " + log_string(i + 1) + ": " + camera_sources[i]);
 
     // Check if this is a video file
     if (isVideoFile(camera_sources[i]))
     {
-      cout << "Detected video file: " << camera_sources[i] << endl;
+      log_debug("Detected video file: " + camera_sources[i]);
       cap.open(camera_sources[i]);
     }
     else
@@ -136,7 +136,7 @@ bool Scorer::initializeCameras()
 
     if (!cap.isOpened())
     {
-      cerr << "Failed to open camera/video " << camera_sources[i] << endl;
+      log_error("Failed to open camera/video " + camera_sources[i]);
       return false;
     }
 
@@ -149,7 +149,7 @@ bool Scorer::initializeCameras()
     // Add to our camera array
     cameras.push_back(cap);
 
-    cout << "Camera/video " << i + 1 << " initialized successfully" << endl;
+    log_info("Camera/video " + log_string(i + 1) + " initialized successfully");
   }
 
   return cameras.size() > 0;
@@ -168,7 +168,7 @@ vector<Mat> Scorer::captureFrames()
 
     if (!success || frame.empty())
     {
-      cerr << "Failed to capture frame from camera " << i + 1 << endl;
+      log_error("Failed to capture frame from camera " + log_string(i + 1));
       continue;
     }
 
@@ -301,7 +301,7 @@ bool Scorer::detectMotion(const vector<Mat> &current_frames)
     // Safety check for empty frames
     if (current_frames[i].empty() || previous_frames[i].empty())
     {
-      cerr << "Empty frame detected in camera " << i + 1 << endl;
+      log_error("Empty frame detected in camera " + log_string(i + 1));
       continue;
     }
 
@@ -430,7 +430,7 @@ string Scorer::detect_score()
 // This simulates the computer vision thread that would detect darts
 void Scorer::vision_thread_func()
 {
-  cout << "Vision thread started" << endl;
+  log_info("Vision thread started");
 
   while (running)
   {
@@ -447,7 +447,7 @@ void Scorer::vision_thread_func()
     this_thread::sleep_for(chrono::milliseconds(1000 / fps));
   }
 
-  cout << "Vision thread stopped" << endl;
+  log_info("Vision thread stopped");
 }
 
 void Scorer::run()
@@ -459,7 +459,7 @@ void Scorer::run()
   vision_thread = thread(&Scorer::vision_thread_func, this);
 
   // Print startup message
-  cout << "Scorer running with " << camera_sources.size() << " cameras" << endl;
+  log_info("Scorer running with " + log_string(camera_sources.size()) + " cameras");
 
   // Main loop - check for and print new scores
   while (running)
@@ -469,7 +469,7 @@ void Scorer::run()
     // Check for new scores using our helper method
     if (getNewScoreIfAvailable(new_score))
     {
-      cout << new_score << endl;
+      log_info(new_score);
     }
 
     // Small sleep to avoid busy waiting - increase to 100ms

@@ -67,6 +67,9 @@ namespace ellipse_processing
         double offsetMagnitude; // Total offset distance (pixels)
         double offsetAngle;     // Offset angle in degrees
 
+        // hasDetectedEllipses: Flag to indicate if all ellipses were detected
+        bool hasDetectedEllipses;
+
         // Default constructor for fallback cases
         EllipseBoundaryData() : hasValidDoubles(false), validOuterPoints(0), validInnerPoints(0),
                                 hasValidTriples(false), hasValidBulls(false),

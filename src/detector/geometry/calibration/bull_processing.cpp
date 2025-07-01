@@ -1,6 +1,6 @@
 #include "bull_processing.hpp"
 #include "color_processing.hpp"
-#include <iostream>
+#include "utils.hpp"
 #include <cmath>
 
 using namespace cv;
@@ -10,7 +10,7 @@ namespace bull_processing
 {
     Point processBull(const Mat &redGreenFrame, const Point &frameCenter, int camera_idx, bool debug_mode, const BullParams &params)
     {
-        cout << "DEBUG: Bull detection camera " << camera_idx << " starting..." << endl;
+        log_info("Bull detection camera " + log_string(camera_idx) + " starting...");
         double confidence;
 
         // Extract red pixels from redGreenFrame
@@ -108,7 +108,7 @@ namespace bull_processing
             {
                 bestScore = score;
                 bestCenter = Point(center2f);
-                cout << "DEBUG: Strategy A - New best score: " << score << " at (" << bestCenter.x << "," << bestCenter.y << ")" << endl;
+                log_debug("Strategy A - New best score: " + log_string(score) + " at (" + log_string(bestCenter.x) + "," + log_string(bestCenter.y) + ")");
             }
         }
 
@@ -116,7 +116,7 @@ namespace bull_processing
         if (bestScore < params.minAcceptableScore)
         {
 
-            cout << "DEBUG: Strategy B - Trying Hough circles (bestScore=" << bestScore << ")" << endl;
+            log_debug("Strategy B - Trying Hough circles (bestScore=" + log_string(bestScore) + ")");
 
             // Create circle detection mask
             // Calculate feature density for adaptive parameters
@@ -144,7 +144,7 @@ namespace bull_processing
                          circleMask.rows / params.houghMinRadiusDivisor,
                          circleMask.rows / params.houghMaxRadiusDivisor);
 
-            cout << "DEBUG: Strategy B - Found " << circles.size() << " circles" << endl;
+            log_debug("Strategy B - Found " + log_string(circles.size()) + " circles");
 
             // Process detected circles
             if (!circles.empty())
@@ -160,12 +160,11 @@ namespace bull_processing
                     double distToCenter = norm(circleCenter - frameCenter);
                     double maxAllowedDistance = min(redGreenFrame.cols, redGreenFrame.rows) / 6.0; // CHANGED: 1/6 instead of 1/4
 
-                    cout << "DEBUG: Strategy B - Circle center: (" << circleCenter.x << "," << circleCenter.y
-                         << "), distance: " << distToCenter << ", max allowed: " << maxAllowedDistance << endl;
+                    log_debug("Strategy B - Circle center: (" + log_string(circleCenter.x) + "," + log_string(circleCenter.y) + "), distance: " + log_string(distToCenter) + ", max allowed: " + log_string(maxAllowedDistance));
 
                     if (distToCenter > maxAllowedDistance)
                     {
-                        cout << "DEBUG: Strategy B - REJECTED circle too far from center!" << endl;
+                        log_warning("Strategy B - REJECTED circle too far from center!");
                         continue;
                     }
 
@@ -192,7 +191,7 @@ namespace bull_processing
                     // Combined score
                     double circleScore = enhancedCentralityScore * params.centerProximityWeight + centerRedness * params.rednessWeight;
 
-                    cout << "DEBUG: Strategy B - Circle at (" << circleCenter.x << "," << circleCenter.y << ") - dist=" << distToCenter << ", score=" << circleScore << endl;
+                    log_debug("Strategy B - Circle at (" + log_string(circleCenter.x) + "," + log_string(circleCenter.y) + ") - dist=" + log_string(distToCenter) + ", score=" + log_string(circleScore));
 
                     if (circleScore > bestCircleScore)
                     {
@@ -206,7 +205,7 @@ namespace bull_processing
                 {
                     bestCenter = Point(cvRound(circles[bestIdx][0]), cvRound(circles[bestIdx][1]));
                     bestScore = bestCircleScore;
-                    cout << "DEBUG: Strategy B - New best score: " << bestScore << " at (" << bestCenter.x << "," << bestCenter.y << ")" << endl;
+                    log_debug("Strategy B - New best score: " + log_string(bestScore) + " at (" + log_string(bestCenter.x) + "," + log_string(bestCenter.y) + ")");
                 }
             }
         }
@@ -214,7 +213,7 @@ namespace bull_processing
         // Strategy C: Color density map (universally applicable)
         if (bestScore < params.minAcceptableScore)
         {
-            cout << "DEBUG: Strategy C - Trying density map (bestScore=" << bestScore << ")" << endl;
+            log_debug("Strategy C - Trying density map (bestScore=" + log_string(bestScore) + ")");
 
             Mat densityMap = Mat::zeros(redGreenFrame.size(), CV_32F);
             Mat mask;
@@ -254,7 +253,7 @@ namespace bull_processing
                 {
                     bestCenter = maxLoc;
                     bestScore = densityScore;
-                    cout << "DEBUG: Strategy C - New best score: " << bestScore << " at (" << bestCenter.x << "," << bestCenter.y << ")" << endl;
+                    log_debug("Strategy C - New best score: " + log_string(bestScore) + " at (" + log_string(bestCenter.x) + "," + log_string(bestCenter.y) + ")");
                 }
             }
         }
@@ -262,8 +261,7 @@ namespace bull_processing
         // Set output confidence
         confidence = bestScore;
 
-        cout << "DEBUG: Bull detection complete - center=(" << bestCenter.x << "," << bestCenter.y
-             << "), confidence=" << confidence << endl;
+        log_info("Bull detection complete - center=(" + log_string(bestCenter.x) + "," + log_string(bestCenter.y) + "), confidence=" + log_string(confidence));
 
         // Debug output with PURPLE visualization
         if (debug_mode)
