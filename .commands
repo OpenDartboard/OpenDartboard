@@ -6,8 +6,11 @@
 #build
 ./build.deb.sh # Build the Debian package
 
+# connect to the Raspberry Pi (change the name to your Pi's)
+ssh pi@opendartboard.local
+
 # Copy the built package to the Raspberry Pi
-scp ./dist/opendartboard_0.11.0.deb pi@dart-relay.local:~
+scp ./dist/opendartboard_0.11.0.deb pi@opendartboard.local:~
 
 # Uninstall the old package if it exists (rasberry pi)
 # what is the -y for? 
@@ -17,8 +20,6 @@ sudo apt remove opendartboard -y
 # Install the new package
 sudo apt install ./opendartboard_0.x.0.deb
 
-# connect to the Raspberry Pi (change the name to your Pi's)
-ssh pi@dart-relay.local
 
 # ---------------- debuging commands --------------------------# 
 
