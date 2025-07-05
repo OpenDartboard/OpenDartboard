@@ -1,6 +1,7 @@
 #pragma once
 
 #include <opencv2/opencv.hpp>
+#include <array> // Add this include
 
 using namespace cv;
 using namespace std;
@@ -29,11 +30,9 @@ namespace wire_processing
     // Public data structures
     struct WireData
     {
-        vector<Point2f> wireEndpoints;
-        vector<int> segmentNumbers;
+        std::array<Point2f, 20> wireEndpoints;
         int camera_index = -1;
         bool isValid = false;
-        string detectionMethod = "unknown"; // Track which method was used
     };
 
     // Public interfaces - using global DartboardCalibration

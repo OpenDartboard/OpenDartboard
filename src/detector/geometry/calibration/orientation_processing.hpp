@@ -28,19 +28,44 @@ namespace orientation_processing
         int spiderSampleCount = 50;      // Number of samples to check along wire extension
     };
 
+    // Camera position enumeration for fixed-size serialization
+    enum class CameraPosition : int
+    {
+        UNKNOWN = 0,
+        TOP = 1,
+        MIDDLE = 2,
+        BOTTOM = 3
+    };
+
     // Result structure for orientation detection
     struct OrientationData
     {
-        int camera_index = -1;                // Which camera this is for
-        bool isStarCamera = false;            // Whether the orientation was successfully detected
-        Point2f orientation;                  // Detected orientation vector (e.g., "20" segment position)
-        int southWireIndex = -1;              // Index of the south wire for this camera
-        int wedge20WireIndex = -1;            // Index of the "20" segment wire
-        float angleOffsetFromSouth = 0.0f;    // Angle offset from the south
-        string cameraPosition = "UNKNOWN";    // Camera position (TOP/MIDDLE/BOTTOM)
-        int wedgeNumber = -1;                 // Wedge number (6, 7, or 12)
-        float avgClipWireCrossProduct = 0.0f; // Average
+        int camera_index = -1;                                   // Which camera this is for
+        bool isStarCamera = false;                               // Whether the orientation was successfully detected
+        Point2f orientation;                                     // Detected orientation vector (e.g., "20" segment position)
+        int southWireIndex = -1;                                 // Index of the south wire for this camera
+        int wedge20WireIndex = -1;                               // Index of the "20" segment wire
+        float angleOffsetFromSouth = 0.0f;                       // Angle offset from the south
+        CameraPosition cameraPosition = CameraPosition::UNKNOWN; // Camera position (enum instead of string)
+        int wedgeNumber = -1;                                    // Wedge number (6, 7, or 12)
+        float avgClipWireCrossProduct = 0.0f;                    // Average
     };
+
+    // Helper function to convert enum to string for display
+    inline string cameraPositionToString(CameraPosition pos)
+    {
+        switch (pos)
+        {
+        case CameraPosition::TOP:
+            return "TOP";
+        case CameraPosition::MIDDLE:
+            return "MIDDLE";
+        case CameraPosition::BOTTOM:
+            return "BOTTOM";
+        default:
+            return "UNKNOWN";
+        }
+    }
 
     // Main processing function
     OrientationData processOrientation(

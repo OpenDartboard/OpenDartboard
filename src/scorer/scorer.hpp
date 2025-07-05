@@ -5,7 +5,7 @@
 #include <mutex>
 #include <atomic>
 #include <opencv2/opencv.hpp>
-#include "detector/dart_detector.hpp"
+#include "detector/detector_interface.hpp"
 
 using namespace std;
 
@@ -37,11 +37,6 @@ private:
 
   // Camera capture related
   vector<cv::VideoCapture> cameras;
-  bool initializeCameras();
-  vector<cv::Mat> captureFrames();
-
-  // Image preprocessing methods
-  std::vector<cv::Mat> preprocessFrames(const std::vector<cv::Mat> &frames);
 
   // Thread and synchronization
   thread vision_thread;
@@ -76,11 +71,8 @@ private:
   std::chrono::steady_clock::time_point last_motion_time;
 
   // Detector - using the common interface
-  std::unique_ptr<DartDetector> detector;
+  std::unique_ptr<DetectorInterface> detector;
   bool use_ai_detector = false;
-
-  // Frame averaging for noise reduction
-  std::vector<cv::Mat> captureAndAverageFrames(int numFrames = 1);
 
   // Frame averaging configuration parameters
   struct FrameAveragingParams

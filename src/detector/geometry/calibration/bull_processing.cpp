@@ -156,7 +156,7 @@ namespace bull_processing
                 {
                     Point circleCenter(cvRound(circles[i][0]), cvRound(circles[i][1]));
 
-                    // MUCH MORE STRICT: Same stricter check for circles
+                    // Same stricter check for circles
                     double distToCenter = norm(circleCenter - frameCenter);
                     double maxAllowedDistance = min(redGreenFrame.cols, redGreenFrame.rows) / 6.0; // CHANGED: 1/6 instead of 1/4
 
