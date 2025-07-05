@@ -250,7 +250,30 @@ void Scorer::run()
   if (detector->isInitialized() == false)
   {
     log_error("Detector is not initialized. Cannot run scorer. Please check your camera setup.");
-    return;
+
+    int attempts = 0;      // Try to wait for cameras to be set up
+    int max_attempts = 50; // Try for 50 attempts
+
+    while (attempts < max_attempts)
+    {
+
+      log_warning("Will attempt to initialize again in 1 minutes... Attempt " + log_string(attempts + 1) + "/" + log_string(max_attempts));
+      this_thread::sleep_for(chrono::seconds(60)); // Wait 1 minutes between attempts
+
+      // try to reinitialize the detector
+      if (detector->initialize(cameras))
+      {
+        break;
+      }
+
+      attempts++;
+    }
+
+    if (attempts >= max_attempts)
+    {
+      log_error("Failed to initialize detector after " + log_string(max_attempts) + " attempts. Exiting.");
+      return; // Exit if we can't initialize
+    }
   }
 
   // Set the running flag
