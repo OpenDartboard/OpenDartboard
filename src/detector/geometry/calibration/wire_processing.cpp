@@ -412,87 +412,6 @@ namespace wire_processing
         return wirePoints;
     }
 
-    // Smooth contour boundaries and find clean edge angles
-    pair<float, float> extractCleanAnglesFromContour(const vector<Point> &contour, Point2f bullCenter)
-    {
-        // Method 1: Smooth the contour boundary using Gaussian blur approach
-        vector<Point2f> smoothedContour;
-
-        // Convert to floating point for smoothing
-        for (const auto &pt : contour)
-        {
-            smoothedContour.push_back(Point2f(pt.x, pt.y));
-        }
-
-        // Apply boundary smoothing - average each point with its neighbors
-        vector<Point2f> smoothed = smoothedContour;
-        int smoothingRadius = 3; // Number of neighbors to average
-
-        for (int iter = 0; iter < 2; iter++)
-        { // Multiple iterations for better smoothing
-            for (size_t i = 0; i < smoothedContour.size(); i++)
-            {
-                Point2f sum(0, 0);
-                int count = 0;
-
-                for (int j = -smoothingRadius; j <= smoothingRadius; j++)
-                {
-                    int idx = (i + j + smoothedContour.size()) % smoothedContour.size();
-                    sum += smoothedContour[idx];
-                    count++;
-                }
-
-                smoothed[i] = sum / count;
-            }
-            smoothedContour = smoothed;
-        }
-
-        // Method 2: Find the extreme angular positions from smoothed contour
-        vector<float> angles;
-        for (const auto &point : smoothedContour)
-        {
-            Point2f direction = point - bullCenter;
-            float angle = atan2(direction.y, direction.x);
-            angles.push_back(angle);
-        }
-
-        if (angles.empty())
-        {
-            // Fallback to original contour
-            for (const auto &point : contour)
-            {
-                Point2f direction = Point2f(point) - bullCenter;
-                float angle = atan2(direction.y, direction.x);
-                angles.push_back(angle);
-            }
-        }
-
-        sort(angles.begin(), angles.end());
-
-        float leftAngle = angles.front();
-        float rightAngle = angles.back();
-
-        // Handle angle wraparound
-        if (rightAngle - leftAngle > CV_PI)
-        {
-            float maxGap = 0;
-            int gapIndex = 0;
-            for (size_t i = 1; i < angles.size(); i++)
-            {
-                float gap = angles[i] - angles[i - 1];
-                if (gap > maxGap)
-                {
-                    maxGap = gap;
-                    gapIndex = i;
-                }
-            }
-            leftAngle = angles[gapIndex];
-            rightAngle = angles[gapIndex - 1];
-        }
-
-        return {leftAngle, rightAngle};
-    }
-
     // Group wires by angular proximity
     vector<vector<Point2f>> groupWiresByAngle(const vector<Point2f> &wires, Point2f center, float angleTolerance)
     {
@@ -713,25 +632,17 @@ namespace wire_processing
         // Choose detection method based on config
         vector<Point2f> colorWires;
 
-        if (config.useHoughLinesDetection)
-        {
-            log_debug("Using HOUGH LINE detection method");
-            result.detectionMethod = "hough_lines";
-            colorWires = findWiresByHoughLines(frame, colorMask, calib, enableDebug, config);
-        }
-        else
-        {
-            log_debug("Using ENSEMBLE detection method (Contour + Hough + Scoring)");
-            result.detectionMethod = "ensemble";
-            colorWires = findWiresByEnsemble(frame, colorMask, calib, enableDebug, config);
-        }
+        log_debug("Using ENSEMBLE detection method (Contour + Hough + Scoring)");
+        colorWires = findWiresByEnsemble(frame, colorMask, calib, enableDebug, config);
 
-        // Set up result
-        result.wireEndpoints = colorWires;
-        result.segmentNumbers = {20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5};
-        result.isValid = (result.wireEndpoints.size() >= 16); // Allow some tolerance
+        // Set up result, take only the first 20 wires
+        for (int i = 0; i < 20; i++)
+        {
+            result.wireEndpoints[i] = colorWires[i];
+        }
+        result.isValid = (result.wireEndpoints.size() == 20); // Allow some tolerance
 
-        log_debug("Found " + log_string(result.wireEndpoints.size()) + " wire boundaries using " + result.detectionMethod);
+        log_debug("Found " + log_string(result.wireEndpoints.size()) + " wire boundaries using ensemble");
         log_debug("Wire detection completed successfully");
 
         // Handle debug output internally

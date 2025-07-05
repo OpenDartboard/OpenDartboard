@@ -2,37 +2,37 @@
 #include <algorithm>
 
 #include "geometry_detector.hpp"
-#include "geometry_dartboard.hpp"
 #include "calibration/geometry_calibration.hpp"
 #include "utils.hpp"
 
 using namespace cv;
 using namespace std;
 
-GeometryDetector::GeometryDetector(bool debug_mode, int target_width, int target_height)
-    : initialized(false), calibrated(false), debug_mode(debug_mode),
-      target_width(target_width), target_height(target_height)
+GeometryDetector::GeometryDetector(bool debug_mode, int target_width, int target_height, int target_fps)
+    : initialized(false), calibrated(false), debug_mode(debug_mode), target_width(target_width), target_height(target_height), target_fps(target_fps)
 {
 }
 
-bool GeometryDetector::initialize(const string &config_path)
+bool GeometryDetector::initialize(vector<VideoCapture> &cameras)
 {
-    log_info("Initializing geometry detector...");
-    initialized = true;
-    calibrated = false;
-    return true;
-}
+    // Try to load cached calibration first
+    calibrations = cache::geometry::load();
+    if (!calibrations.empty())
+    {
+        // Already calibrated, just set initialized
+        log_info("Loaded cached calibration with " + to_string(calibrations.size()) + " cameras");
+        initialized = true;
+        calibrated = true;
+        return true;
+    }
 
-bool GeometryDetector::initialize(const string &config_path, const vector<cv::Mat> &initial_frames)
-{
-    if (!initialize(config_path))
-        return false;
+    log_info("Capturing frames for calibration...");
+    vector<Mat> initial_frames = camera::captureAndAverageFrames(cameras, target_width, target_height, target_fps, 75);
 
     if (!initial_frames.empty())
     {
         log_info("Performing immediate calibration...");
 
-        // Call calibration method directly instead of using wrapper
         calibrations = geometry_calibration::calibrateMultipleCameras(
             initial_frames,
             debug_mode,
@@ -43,45 +43,47 @@ bool GeometryDetector::initialize(const string &config_path, const vector<cv::Ma
 
         if (calibrated)
         {
-            // Save frames as background
+            // Save frames as background (for dart detection)
             background_frames.clear();
             for (const auto &frame : initial_frames)
                 background_frames.push_back(frame.clone());
 
             log_info("Initial calibration completed successfully");
+
+            // Save calibration for next time - simple!
+            if (cache::geometry::save(calibrations))
+            {
+                log_info("Saved calibration");
+            }
+
+            initialized = true;
+            calibrated = true;
         }
         else
         {
             log_error("Initial calibration failed");
+            initialized = false;
+            calibrated = false;
         }
+    }
+    else
+    {
+        log_error("No initial frames captured for calibration");
+        initialized = false;
+        calibrated = false;
     }
 
     return initialized;
 }
 
-// Detect darts in the provided frames
+// main function for detecting darts in the provided frames
 vector<DartDetection> GeometryDetector::detectDarts(const vector<cv::Mat> &frames)
 {
     // Calibrate if needed
     if (!calibrated)
     {
-        // Call calibration method directly
-        calibrations = geometry_calibration::calibrateMultipleCameras(
-            frames,
-            debug_mode,
-            target_width,
-            target_height);
-
-        calibrated = !calibrations.empty();
-
-        if (!calibrated)
-            return {};
-
-        background_frames.clear();
-        for (const auto &frame : frames)
-            background_frames.push_back(frame.clone());
-
-        return {}; // No darts during calibration
+        log_error("Detector not calibrated, performing calibration...");
+        return {};
     }
 
     // Process each camera frame to find darts
@@ -96,7 +98,7 @@ vector<DartDetection> GeometryDetector::detectDarts(const vector<cv::Mat> &frame
         // Find darts in this camera's frame
         Mat curr_processed = preprocessFrame(frames[i]);
         Mat bg_processed = preprocessFrame(background_frames[i]);
-        vector<DartDetection> camera_detections = findDarts(curr_processed, bg_processed);
+        vector<DartDetection> camera_detections = findDarts(curr_processed, bg_processed, i);
 
         // Set camera index for each detection
         for (auto &det : camera_detections)
@@ -110,7 +112,7 @@ vector<DartDetection> GeometryDetector::detectDarts(const vector<cv::Mat> &frame
 }
 
 // Detect darts using background subtraction and contour analysis
-vector<DartDetection> GeometryDetector::findDarts(const Mat &frame, const Mat &background)
+vector<DartDetection> GeometryDetector::findDarts(const Mat &frame, const Mat &background, int camIndex)
 {
     if (frame.empty() || background.empty())
         return {};
@@ -125,12 +127,20 @@ vector<DartDetection> GeometryDetector::findDarts(const Mat &frame, const Mat &b
 
     // Threshold to find significant changes
     Mat thresh;
-    threshold(diff, thresh, 20, 255, THRESH_BINARY);
+    threshold(diff, thresh, 15, 255, THRESH_BINARY);
 
     // Clean up the binary image
     Mat kernel = getStructuringElement(MORPH_ELLIPSE, Size(5, 5));
     morphologyEx(thresh, thresh, MORPH_CLOSE, kernel);
-    morphologyEx(thresh, thresh, MORPH_OPEN, getStructuringElement(MORPH_ELLIPSE, Size(3, 3)));
+    morphologyEx(thresh, thresh, MORPH_OPEN, getStructuringElement(MORPH_ELLIPSE, Size(2, 2)));
+
+    // Debug visualization
+    if (debug_mode)
+    {
+        system("mkdir -p debug_frames/geometry_detector");
+        imwrite("debug_frames/geometry_detector/diff_image_" + to_string(camIndex) + ".jpg", diff);
+        imwrite("debug_frames/geometry_detector/thresh_image_" + to_string(camIndex) + ".jpg", thresh);
+    }
 
     // Find contours in the thresholded image
     vector<vector<Point>> contours;
@@ -138,6 +148,13 @@ vector<DartDetection> GeometryDetector::findDarts(const Mat &frame, const Mat &b
 
     // Process contours to find dart candidates
     vector<DartDetection> all_detections;
+
+    // Debug frame for visualization
+    Mat debug_frame;
+    if (debug_mode)
+    {
+        debug_frame = frame.clone();
+    }
 
     for (const auto &contour : contours)
     {
@@ -150,6 +167,13 @@ vector<DartDetection> GeometryDetector::findDarts(const Mat &frame, const Mat &b
         double aspect_ratio = bbox.width / (double)bbox.height;
         if (aspect_ratio < 0.15 || aspect_ratio > 1.5)
             continue;
+
+        // Debug: Draw all candidate contours
+        if (debug_mode)
+        {
+            drawContours(debug_frame, vector<vector<Point>>{contour}, -1, Scalar(0, 255, 0), 2);
+            rectangle(debug_frame, bbox, Scalar(255, 0, 0), 1);
+        }
 
         // Find point closest to any dartboard center
         Point best_point(-1, -1);
@@ -170,7 +194,7 @@ vector<DartDetection> GeometryDetector::findDarts(const Mat &frame, const Mat &b
             }
         }
 
-        int radius = 50; // hadcoded for now;
+        int radius = 50; // hardcoded for now
 
         // Validate dart candidate
         if (best_point.x >= 0 && closest_calib)
@@ -182,10 +206,24 @@ vector<DartDetection> GeometryDetector::findDarts(const Mat &frame, const Mat &b
                 DartDetection detection;
                 detection.position = best_point;
                 detection.confidence = 0.9 - (dist_to_center / (radius * 2.0));
-                detection.score = GeometryDartboard::calculateScore(best_point, *closest_calib);
+                detection.score = calculateScore(best_point, *closest_calib);
                 all_detections.push_back(detection);
+
+                // Debug: Mark valid detections
+                if (debug_mode)
+                {
+                    circle(debug_frame, best_point, 10, Scalar(0, 0, 255), 3);
+                    putText(debug_frame, detection.score, Point(best_point.x + 15, best_point.y),
+                            FONT_HERSHEY_SIMPLEX, 0.6, Scalar(0, 0, 255), 2);
+                }
             }
         }
+    }
+
+    // Save debug frame
+    if (debug_mode && !debug_frame.empty())
+    {
+        imwrite("debug_frames/geometry_detector/dart_candidates_" + to_string(camIndex) + ".jpg", debug_frame);
     }
 
     // Remove duplicates
@@ -237,4 +275,18 @@ cv::Mat GeometryDetector::preprocessFrame(const cv::Mat &frame, bool preserveCol
     // Apply Gaussian blur
     cv::GaussianBlur(gray, gray, cv::Size(5, 5), 0);
     return gray;
+}
+
+std::string GeometryDetector::calculateScore(
+    const cv::Point &dartPosition,
+    const DartboardCalibration &calib)
+{
+
+    // Dont currenlty work
+    return "MISS";
+
+    // -----
+
+    // TODO: the fueture of this code is to calculate the score of a dart throw
+    // Check if dart position is valid
 }

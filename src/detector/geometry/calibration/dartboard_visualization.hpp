@@ -165,7 +165,7 @@ namespace dartboard_visualization
                         cv::Point(20, 100), cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 255, 255), 2);
 
             // Wire detection info
-            std::string wireInfo = "Wires: " + std::to_string(calib.wires.wireEndpoints.size()) + "/40 (" + calib.wires.detectionMethod + ")";
+            std::string wireInfo = "Wires: " + std::to_string(calib.wires.wireEndpoints.size()) + "/??";
             cv::Scalar wireColor = calib.wires.isValid ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255);
             cv::putText(visFrame, wireInfo, cv::Point(20, 130),
                         cv::FONT_HERSHEY_SIMPLEX, 0.6, wireColor, 2);

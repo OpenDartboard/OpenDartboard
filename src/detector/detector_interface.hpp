@@ -3,6 +3,9 @@
 #include <vector>
 #include <opencv2/opencv.hpp>
 
+using namespace cv;
+using namespace std;
+
 struct DartDetection
 {
     cv::Point position;   // Position of the dart tip
@@ -12,16 +15,16 @@ struct DartDetection
 };
 
 // Abstract interface for any dart detection method
-class DartDetector
+class DetectorInterface
 {
 public:
-    virtual ~DartDetector() = default;
+    virtual ~DetectorInterface() = default;
 
     // Initialize the detector
-    virtual bool initialize(const std::string &model_path) = 0;
+    virtual bool initialize(vector<VideoCapture> &cameras) = 0;
 
     // Process frames and return detected darts
-    virtual std::vector<DartDetection> detectDarts(const std::vector<cv::Mat> &frames) = 0;
+    virtual vector<DartDetection> detectDarts(const vector<Mat> &frames) = 0;
 
     // Whether the detector is ready
     virtual bool isInitialized() const = 0;

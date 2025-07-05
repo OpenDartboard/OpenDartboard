@@ -34,6 +34,9 @@ namespace geometry_calibration
 
         DartboardCalibration calibration;
         calibration.camera_index = cameraIdx;
+        calibration.capture_width = frame.cols;
+        calibration.capture_height = frame.rows;
+        calibration.timestamp = static_cast<uint64_t>(time(nullptr)); // Current Unix timestamp
 
         Mat orginalFrame = frame.clone();
         Point frameCenter = math::calculateFrameCenter(frame);
@@ -91,6 +94,7 @@ namespace geometry_calibration
     vector<DartboardCalibration> calibrateMultipleCameras(const vector<Mat> &frames, bool debugMode, int targetWidth, int targetHeight)
     {
         vector<DartboardCalibration> calibrations;
+
         log_debug("DARTBOARD CALIBRATION STARTED");
 
         if (frames.empty())

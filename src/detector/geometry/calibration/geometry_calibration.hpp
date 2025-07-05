@@ -16,6 +16,9 @@ struct DartboardCalibration
     Point bullCenter{0, 0};  // Bull center (true dartboard center)
     Point frameCenter{0, 0}; // Frame center
     int camera_index = -1;   // Which camera this is for
+    int capture_width = -1;  // Width of the captured frame
+    int capture_height = -1; // Height of the captured frame
+    uint64_t timestamp = 0;  // Unix timestamp of when this calibration was captured
 
     // ELLIPSES: Dartboard shape and rings
     ellipse_processing::EllipseBoundaryData ellipses; // Contains all ellipse data

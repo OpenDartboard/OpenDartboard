@@ -1,20 +1,22 @@
 #pragma once
 
-#include "../dart_detector.hpp"
+#include "../detector_interface.hpp"
 #include "calibration/geometry_calibration.hpp"
 #include <opencv2/opencv.hpp>
 #include <vector>
 
-class GeometryDetector : public DartDetector
+using namespace cv;
+using namespace std;
+
+class GeometryDetector : public DetectorInterface
 {
 public:
-    GeometryDetector(bool debug_mode = false, int target_width = 640, int target_height = 480);
+    GeometryDetector(bool debug_mode, int target_width, int target_height, int target_fps);
     virtual ~GeometryDetector() = default;
 
-    virtual bool initialize(const std::string &config_path) override;
-    bool initialize(const std::string &config_path, const std::vector<cv::Mat> &initial_frames);
+    virtual bool initialize(vector<VideoCapture> &cameras) override;
     virtual bool isInitialized() const override { return initialized; }
-    virtual std::vector<DartDetection> detectDarts(const std::vector<cv::Mat> &frames) override;
+    virtual vector<DartDetection> detectDarts(const vector<Mat> &frames) override;
 
 protected:
     bool initialized;
@@ -22,10 +24,12 @@ protected:
     bool debug_mode;
     int target_width;
     int target_height;
-    std::vector<DartboardCalibration> calibrations;
-    std::vector<cv::Mat> background_frames;
+    int target_fps;
+    vector<DartboardCalibration> calibrations;
+    vector<Mat> background_frames;
 
     // Detector methods - removed calibrateDartboard
-    std::vector<DartDetection> findDarts(const cv::Mat &frame, const cv::Mat &background);
-    cv::Mat preprocessFrame(const cv::Mat &frame, bool preserveColor = false);
+    vector<DartDetection> findDarts(const Mat &frame, const Mat &background, int camIndex);
+    Mat preprocessFrame(const Mat &frame, bool preserveColor = false);
+    string calculateScore(const Point &dartPosition, const DartboardCalibration &calib);
 };

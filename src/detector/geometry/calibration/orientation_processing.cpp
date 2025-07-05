@@ -266,7 +266,7 @@ namespace orientation_processing
         // STEP 3: Determine camera position and calculate all orientation data
         if (result.isStarCamera)
         {
-            result.cameraPosition = "MIDDLE";
+            result.cameraPosition = CameraPosition::MIDDLE;
             result.wedgeNumber = 6;
             // For star camera: wedge 20 is 5 steps back from south wire (wedge 6)
             result.wedge20WireIndex = result.southWireIndex - 5;
@@ -304,7 +304,7 @@ namespace orientation_processing
                     if (result.avgClipWireCrossProduct < 0)
                     {
                         // Clip wires are predominantly to the LEFT of south line → TOP camera → wedge 12
-                        result.cameraPosition = "TOP";
+                        result.cameraPosition = CameraPosition::TOP;
                         result.wedgeNumber = 12;
                         // For top camera: wedge 20 is 17 steps back from south wire (wedge 12)
                         result.wedge20WireIndex = result.southWireIndex - 18;
@@ -314,7 +314,7 @@ namespace orientation_processing
                     else
                     {
                         // Clip wires are predominantly to the RIGHT of south line → BOTTOM camera → wedge 7
-                        result.cameraPosition = "BOTTOM";
+                        result.cameraPosition = CameraPosition::BOTTOM;
                         result.wedgeNumber = 7;
                         // For bottom camera: wedge 20 is 12 steps back from south wire (wedge 7)
                         result.wedge20WireIndex = result.southWireIndex - 12;
@@ -326,7 +326,7 @@ namespace orientation_processing
         }
 
         // STEP 4: Debug output
-        log_info("Camera " + log_string(calib.camera_index) + " Position: " + result.cameraPosition);
+        log_info("Camera " + log_string(calib.camera_index) + " Position: " + cameraPositionToString(result.cameraPosition));
         log_info("Camera " + log_string(calib.camera_index) + " Wedge Number: " + log_string(result.wedgeNumber));
         log_info("Camera " + log_string(calib.camera_index) + " South Wire Index: " + log_string(result.southWireIndex));
         log_info("Camera " + log_string(calib.camera_index) + " Wedge 20 Wire Index: " + log_string(result.wedge20WireIndex));
@@ -414,7 +414,7 @@ namespace orientation_processing
             // Add comprehensive camera status text
             string statusText = "CAM " + to_string(calib.camera_index) + ": " +
                                 (result.isStarCamera ? "STAR" : "NON-STAR") + " | " +
-                                result.cameraPosition + " | WEDGE " + to_string(result.wedgeNumber) +
+                                cameraPositionToString(result.cameraPosition) + " | WEDGE " + to_string(result.wedgeNumber) +
                                 " | S:" + to_string(result.southWireIndex) + " | W20:" + to_string(result.wedge20WireIndex);
             putText(orientationDebug, statusText, Point(20, 30), FONT_HERSHEY_SIMPLEX, 0.6, Scalar(0, 0, 0), 2);
 
