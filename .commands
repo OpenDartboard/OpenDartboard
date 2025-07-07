@@ -56,3 +56,4 @@ opendartboard --debug --cams mocks/cam_1.mp4,mocks/cam_2.mp4,mocks/cam_3.mp4
 
 # all ine-line commands
 cmake -S . -B build -DCMAKE_PREFIX_PATH=/usr/local && cmake --build build -j4 && cp build/opendartboard /usr/local/bin/opendartboard && opendartboard --debug --cams mocks/cam_1.mp4,mocks/cam_2.mp4,mocks/cam_3.mp4 --width 1270 --height 720
+cmake -S . -B build -DCMAKE_PREFIX_PATH=/usr/local -DCMAKE_CXX_FLAGS="-DDEBUG_SEEK_VIDEO" && cmake --build build -j4 && cp build/opendartboard /usr/local/bin/opendartboard && opendartboard --debug --cams mocks/cam_1.mp4,mocks/cam_2.mp4,mocks/cam_3.mp4 --width 1270 --height 720

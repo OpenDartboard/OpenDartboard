@@ -31,6 +31,9 @@ int main(int argc, char **argv)
   bool debug_mode = hasFlag(argc, argv, "--debug") || hasFlag(argc, argv, "-d");
   bool quite_mode = hasFlag(argc, argv, "--quiet") || hasFlag(argc, argv, "-q");
 
+  // Replace boolean flag with detector type string
+  string detector_type = getArg(argc, argv, "--detector", "geometry");
+
   // set log level based on debug mode
   if (debug_mode)
   {
@@ -43,15 +46,12 @@ int main(int argc, char **argv)
     log_info("Quiet mode enabled - showing only error messages");
   }
 
-  // Add command-line flag to choose detector
-  bool use_ai_detector = hasFlag(argc, argv, "--use-ai");
-
   // Print startup and configuration information
   debug::printStartup("OpenDartboard", version);
   debug::printConfig(width, height, fps, model_path, cams);
 
   // Initialise the scorer with debug mode if requested
-  Scorer scorer(model_path, width, height, fps, cams, debug_mode, use_ai_detector);
+  Scorer scorer(model_path, width, height, fps, cams, debug_mode, detector_type);
 
   // Register signal handlers with a lambda to stop the scorer
   signals::setupSignalHandlers([&scorer]()
