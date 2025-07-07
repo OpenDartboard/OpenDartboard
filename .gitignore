@@ -8,4 +8,4 @@ docker-build.log
 /.vscode/container-includes
 /debug_frames
 .DS_Store
-geometry_calibration.dat
+/cache
