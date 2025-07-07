@@ -21,13 +21,18 @@ bool GeometryDetector::initialize(vector<VideoCapture> &cameras)
     {
         // Already calibrated, just set initialized
         log_info("Loaded cached calibration with " + to_string(calibrations.size()) + " cameras");
+
+        // Load background frames
+        background_frames = cache::geometry::loadBackgroundFrames();
+
+        // set initialized and calibrated
         initialized = true;
         calibrated = true;
         return true;
     }
 
     log_info("Capturing frames for calibration...");
-    vector<Mat> initial_frames = camera::captureAndAverageFrames(cameras, target_width, target_height, target_fps, 75);
+    vector<Mat> initial_frames = camera::captureAndAverageFrames(cameras, target_width, target_height, target_fps, 75); // Capture 75 frames for averaging
 
     if (!initial_frames.empty())
     {
@@ -50,10 +55,16 @@ bool GeometryDetector::initialize(vector<VideoCapture> &cameras)
 
             log_info("Initial calibration completed successfully");
 
-            // Save calibration for next time - simple!
+            // Save calibration for future use
             if (cache::geometry::save(calibrations))
             {
                 log_info("Saved calibration");
+            }
+
+            // Save background frames for dart detection
+            if (cache::geometry::saveBackgroundFrames(background_frames))
+            {
+                log_info("Saved background frames");
             }
 
             initialized = true;

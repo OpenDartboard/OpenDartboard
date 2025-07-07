@@ -30,7 +30,9 @@ namespace cache
         // Generate standard filename for calibration cache
         inline string generateFilename()
         {
-            return "geometry_calibration.dat";
+            // Create cache directory if it doesn't exist
+            system("mkdir -p cache");
+            return "cache/geometry_calibration.dat";
         }
 
         // Load calibration data from binary file - return calibrations directly
@@ -116,6 +118,75 @@ namespace cache
             {
                 log_error("Error saving calibration: " + string(e.what()));
                 return false;
+            }
+        }
+
+        // Save background frames as individual image files
+        inline bool saveBackgroundFrames(const vector<Mat> &background_frames)
+        {
+            try
+            {
+                system("mkdir -p cache/backgrounds");
+
+                for (size_t i = 0; i < background_frames.size(); i++)
+                {
+                    if (!background_frames[i].empty())
+                    {
+                        string filename = "cache/backgrounds/camera_" + to_string(i) + "_background.jpg";
+                        if (!imwrite(filename, background_frames[i]))
+                        {
+                            log_error("Failed to save background frame for camera " + to_string(i));
+                            return false;
+                        }
+                    }
+                }
+
+                log_info("Saved " + to_string(background_frames.size()) + " background frames");
+                return true;
+            }
+            catch (const exception &e)
+            {
+                log_error("Error saving background frames: " + string(e.what()));
+                return false;
+            }
+        }
+
+        // Load background frames from individual image files
+        inline vector<Mat> loadBackgroundFrames()
+        {
+            vector<Mat> background_frames;
+
+            try
+            {
+                // Try to load background frames (check for up to 3 cameras)
+                for (int i = 0; i < 3; i++)
+                {
+                    string filename = "cache/backgrounds/camera_" + to_string(i) + "_background.jpg";
+                    Mat frame = imread(filename);
+
+                    if (!frame.empty())
+                    {
+                        background_frames.push_back(frame);
+                        log_debug("Loaded background frame for camera " + to_string(i));
+                    }
+                    else
+                    {
+                        // Stop when we can't find more consecutive frames
+                        break;
+                    }
+                }
+
+                if (!background_frames.empty())
+                {
+                    log_info("Loaded " + to_string(background_frames.size()) + " background frames");
+                }
+
+                return background_frames;
+            }
+            catch (const exception &e)
+            {
+                log_error("Error loading background frames: " + string(e.what()));
+                return vector<Mat>();
             }
         }
     }
