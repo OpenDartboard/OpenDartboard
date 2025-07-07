@@ -46,6 +46,24 @@ namespace camera
             {
                 log_debug("Detected video file: " + camera_sources[i]);
                 cap.open(camera_sources[i]);
+
+#ifdef DEBUG_SEEK_VIDEO
+                int seek_seconds = 5;
+                if (seek_seconds > 0 && cap.isOpened())
+                {
+                    double video_fps = cap.get(CAP_PROP_FPS);
+                    if (video_fps > 0)
+                    {
+                        int target_frame = static_cast<int>(video_fps * seek_seconds);
+                        cap.set(CAP_PROP_POS_FRAMES, target_frame);
+                        log_info("Seeked video " + log_string(i + 1) + " forward by " + log_string(seek_seconds) + " seconds (frame " + log_string(target_frame) + ")");
+                    }
+                    else
+                    {
+                        log_warning("Could not determine FPS for video " + camera_sources[i] + ", skipping seek");
+                    }
+                }
+#endif
             }
             else
             {
