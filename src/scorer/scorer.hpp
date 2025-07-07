@@ -12,10 +12,10 @@ using namespace std;
 class Scorer
 {
 public:
-  // Added use_ai parameter to match implementation in cpp file
+  // Updated to use detector type string instead of boolean
   Scorer(const std::string &model, int width, int height, int fps,
          const std::vector<std::string> &cams, bool debug_mode = false,
-         bool use_ai = false);
+         const std::string &detector_type = "geometry");
   ~Scorer();
 
   // Start the scoring process and don't return until stopped
@@ -72,7 +72,7 @@ private:
 
   // Detector - using the common interface
   std::unique_ptr<DetectorInterface> detector;
-  bool use_ai_detector = false;
+  std::string detector_type_name = "geometry"; // Store detector type name
 
   // Frame averaging configuration parameters
   struct FrameAveragingParams

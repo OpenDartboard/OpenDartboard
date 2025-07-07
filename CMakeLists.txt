@@ -34,7 +34,7 @@ pkg_check_modules(TESSERACT REQUIRED tesseract)
 add_executable(opendartboard
     src/main.cpp
     src/scorer/scorer.cpp
-    # src/detector/ai/yolo_detector.cpp
+    # src/detector/ai/yolo_detector.cpp // Uncomment when AI detector is ready
     src/detector/geometry/geometry_detector.cpp
     # calibration files
     src/detector/geometry/calibration/geometry_calibration.cpp
@@ -73,6 +73,7 @@ target_link_libraries(opendartboard
         ${GSTREAMER_BASE_LIBRARIES}
         ${GSTREAMER_VIDEO_LIBRARIES}
         ${TESSERACT_LIBRARIES}
+        ${CMAKE_DL_LIBS}
         Threads::Threads  # Add pthread linking
 )
 

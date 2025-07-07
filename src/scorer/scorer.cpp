@@ -11,8 +11,8 @@
 using namespace std;
 using namespace cv;
 
-Scorer::Scorer(const string &model, int w, int h, int fps, const vector<string> &cams, bool debug_mode, bool use_ai)
-    : model_path(model), width(w), height(h), fps(fps), camera_sources(cams), debug_display(debug_mode), use_ai_detector(use_ai)
+Scorer::Scorer(const string &model, int w, int h, int fps, const vector<string> &cams, bool debug_mode, const string &detector_type)
+    : model_path(model), width(w), height(h), fps(fps), camera_sources(cams), debug_display(debug_mode), detector_type_name(detector_type)
 {
   // Initialize cameras using utility function
   if (!camera::initializeCameras(cameras, camera_sources, width, height, fps))
@@ -21,8 +21,8 @@ Scorer::Scorer(const string &model, int w, int h, int fps, const vector<string> 
     return;
   }
 
-  // Create the appropriate detector - pass debug flag AND resolution to detector
-  detector = DetectorFactory::createDetector(use_ai_detector, debug_display, width, height, fps);
+  // Create the appropriate detector using string type
+  detector = DetectorFactory::createDetector(detector_type_name, debug_display, width, height, fps);
 
   // Simple initialization - let detector handle its own calibration needs
   if (!detector->initialize(cameras))

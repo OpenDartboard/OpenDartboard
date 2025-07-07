@@ -46,14 +46,16 @@ namespace debug
     {
         std::cout << "Usage: opendartboard [options]\n";
         std::cout << "Options:\n";
-        std::cout << "  --model <path>     Path to the model file (default: /usr/local/share/opendartboard/models/dart.param)\n";
-        std::cout << "  --cams <cameras>   Comma-separated list of camera devices (default: /dev/video0,/dev/video1,/dev/video2)\n";
-        std::cout << "  --width <width>    Frame width (default: 640)\n";
-        std::cout << "  --height <height>  Frame height (default: 360)\n";
-        std::cout << "  --fps <fps>        Frames per second (default: 15)\n";
-        std::cout << "  --debug, -d        Enable debug mode (saves frames to debug_frames/ directory)\n";
-        std::cout << "  --version          Show version information\n";
-        std::cout << "  --help             Show this help message\n";
+        std::cout << "  --model <path>       Path to the AI model file (default: /usr/local/share/opendartboard/models/dart.param)\n";
+        std::cout << "  --cams <cameras>     Comma-separated list of camera devices (default: /dev/video0,/dev/video1,/dev/video2)\n";
+        std::cout << "  --width <width>      Frame width (default: 640)\n";
+        std::cout << "  --height <height>    Frame height (default: 360)\n";
+        std::cout << "  --fps <fps>          Frames per second (default: 15)\n";
+        std::cout << "  --detector <type>    Detector type: geometry, ai, custom (default: geometry)\n";
+        std::cout << "  --debug, -d          Enable debug mode (saves frames to debug_frames/ directory)\n";
+        std::cout << "  --quiet, -q          Quiet mode (only show errors)\n";
+        std::cout << "  --version            Show version information\n";
+        std::cout << "  --help               Show this help message\n";
         exit(0);
     }
 
