@@ -87,53 +87,21 @@ bool Scorer::detectMotion(const vector<Mat> &current_frames)
     return false;
   }
 
-  bool motion_detected = false;
-
-  // Check each camera for motion
-  for (size_t i = 0; i < current_frames.size() && i < previous_frames.size(); i++)
-  {
-    // Safety check for empty frames
-    if (current_frames[i].empty() || previous_frames[i].empty())
-    {
-      log_error("Empty frame detected in camera " + log_string(i + 1));
-      continue;
-    }
-
-    // Convert frames to grayscale
-    Mat prev_gray = debug::convertToGrayscale(previous_frames[i]);
-    Mat curr_gray = debug::convertToGrayscale(current_frames[i]);
-
-    // Get thresholded motion image
-    Mat motion_mask = debug::applyMotionThreshold(prev_gray, curr_gray);
-
-    // Skip if motion_mask is empty (error occurred)
-    if (motion_mask.empty())
-    {
-      continue;
-    }
-
-    // Count non-zero pixels to determine amount of motion
-    int motion_pixels = countNonZero(motion_mask);
-    int motion_threshold = (motion_mask.rows * motion_mask.cols) * motionParams.motionThresholdRatio;
-
-    if (motion_pixels > motion_threshold)
-    {
-      motion_detected = true;
-
-      // Save motion frames in debug mode
-      if (debug_display)
-      {
-        debug::saveFrames({motion_mask}, "motion");
-      }
-      break;
-    }
-  }
+  // Use camera utility for motion detection with our threshold
+  bool motion_detected = camera::detectMotion(current_frames, previous_frames, motionParams.motionThresholdRatio);
 
   // Update previous frames for next comparison
   previous_frames.clear();
   for (const auto &frame : current_frames)
   {
     previous_frames.push_back(frame.clone());
+  }
+
+  // Save motion frames in debug mode (if needed)
+  if (debug_display && motion_detected)
+  {
+    // Could add debug frame saving here if needed
+    log_debug("Motion detected");
   }
 
   return motion_detected;
@@ -148,13 +116,6 @@ string Scorer::detect_score()
   {
     cerr << "No frames captured from any camera" << endl;
     return "";
-  }
-
-  // Save raw frames if debug mode is enabled
-  if (debug_display)
-  {
-    // temporarily disabled to avoid excessive file writes
-    // debug::saveFrames(frames);
   }
 
   // Step 2: Detect motion between frames
