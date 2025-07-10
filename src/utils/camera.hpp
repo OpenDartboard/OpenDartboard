@@ -170,4 +170,86 @@ namespace camera
 
         return averagedFrames;
     }
+
+    // Helper function for motion detection - convert frame to grayscale
+    inline Mat convertToGrayscale(const Mat &frame)
+    {
+        Mat gray;
+        if (frame.channels() == 3)
+        {
+            cvtColor(frame, gray, COLOR_BGR2GRAY);
+        }
+        else
+        {
+            gray = frame.clone();
+        }
+        return gray;
+    }
+
+    // Helper function for motion detection - apply threshold and morphology
+    inline Mat applyMotionThreshold(const Mat &frame1, const Mat &frame2)
+    {
+        // Check if frames have the same size and type
+        if (frame1.size() != frame2.size() || frame1.type() != frame2.type())
+        {
+            log_error("Frame size or type mismatch in motion detection: " + to_string(frame1.cols) + "x" + to_string(frame1.rows) + " vs " + to_string(frame2.cols) + "x" + to_string(frame2.rows));
+            return Mat(); // Return empty matrix
+        }
+
+        // Calculate absolute difference
+        Mat diff;
+        absdiff(frame1, frame2, diff);
+
+        // Apply threshold
+        Mat thresh;
+        threshold(diff, thresh, 25, 255, THRESH_BINARY);
+
+        // Apply morphological operations to reduce noise
+        Mat kernel = getStructuringElement(MORPH_RECT, Size(5, 5));
+        morphologyEx(thresh, thresh, MORPH_CLOSE, kernel);
+
+        return thresh;
+    }
+
+    // Detect motion between current and previous frames using proper threshold calculation
+    inline bool detectMotion(const vector<Mat> &current_frames, const vector<Mat> &previous_frames, double threshold_ratio = 0.05)
+    {
+        if (current_frames.size() != previous_frames.size() || current_frames.empty())
+        {
+            return false;
+        }
+
+        for (size_t i = 0; i < current_frames.size(); i++)
+        {
+            if (current_frames[i].empty() || previous_frames[i].empty())
+            {
+                continue;
+            }
+
+            // Convert to grayscale
+            Mat prev_gray = convertToGrayscale(previous_frames[i]);
+            Mat curr_gray = convertToGrayscale(current_frames[i]);
+
+            // Get motion mask
+            Mat motion_mask = applyMotionThreshold(prev_gray, curr_gray);
+
+            // Skip if motion_mask is empty (error occurred)
+            if (motion_mask.empty())
+            {
+                continue;
+            }
+
+            // Count motion pixels and calculate ratio
+            int motion_pixels = countNonZero(motion_mask);
+            int total_pixels = motion_mask.rows * motion_mask.cols;
+            double motion_ratio = (double)motion_pixels / total_pixels;
+
+            if (motion_ratio > threshold_ratio)
+            {
+                return true; // Motion detected on this camera
+            }
+        }
+
+        return false; // No motion detected on any camera
+    }
 }
