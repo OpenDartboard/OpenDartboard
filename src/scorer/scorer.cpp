@@ -14,17 +14,17 @@ using namespace cv;
 Scorer::Scorer(const string &model, int w, int h, int fps, const vector<string> &cams, bool debug_mode, const string &detector_type)
     : model_path(model), width(w), height(h), fps(fps), camera_sources(cams), debug_display(debug_mode), detector_type_name(detector_type)
 {
-  // Initialize cameras using utility function
+  // Initialize cameras
   if (!camera::initializeCameras(cameras, camera_sources, width, height, fps))
   {
     log_error("Failed to initialize cameras");
     return;
   }
 
-  // Create the appropriate detector using string type
+  // Create detector
   detector = DetectorFactory::createDetector(detector_type_name, debug_display, width, height, fps);
 
-  // Simple initialization - let detector handle its own calibration needs
+  // Initialize detector
   if (!detector->initialize(cameras))
   {
     log_error("Failed to initialize detector.");
@@ -35,231 +35,70 @@ Scorer::Scorer(const string &model, int w, int h, int fps, const vector<string> 
   }
 }
 
-// Re-adding the destructor
 Scorer::~Scorer()
 {
   stop();
 }
 
-// The main run method that starts the vision thread
 void Scorer::stop()
 {
   running = false;
-  if (vision_thread.joinable())
-  {
-    vision_thread.join();
-  }
 }
 
-// Helper method to set a new score (handles the mutex locking internally)
-void Scorer::setNewScore(const string &score)
+void Scorer::sendResult(const DetectorResult &result)
 {
-  lock_guard<mutex> lock(score_mutex);
-  current_score = score;
-  new_score_available = true;
-}
-
-// Helper method to get a new score if one is available
-bool Scorer::getNewScoreIfAvailable(string &score_out)
-{
-  lock_guard<mutex> lock(score_mutex);
-  if (new_score_available)
+  // For now, just log it - later this becomes WebSocket/API
+  if (result.dart_detected)
   {
-    score_out = current_score;
-    new_score_available = false;
-    return true;
-  }
-  return false;
-}
-
-// Detect motion between frames
-bool Scorer::detectMotion(const vector<Mat> &current_frames)
-{
-  // Skip if we don't have previous frames for comparison
-  if (previous_frames.empty() || previous_frames.size() != current_frames.size())
-  {
-    // Store current frames as previous for next comparison
-    previous_frames.clear();
-    for (const auto &frame : current_frames)
-    {
-      previous_frames.push_back(frame.clone());
-    }
-    return false;
+    log_info("SCORE: " + result.score +
+             " | Position: (" + to_string((int)result.position.x) + "," + to_string((int)result.position.y) + ")" +
+             " | Confidence: " + to_string(result.confidence) +
+             " | Camera: " + to_string(result.camera_index) +
+             " | Processing: " + to_string(result.processing_time_ms) + "ms");
   }
 
-  // Use camera utility for motion detection with our threshold
-  bool motion_detected = camera::detectMotion(current_frames, previous_frames, motionParams.motionThresholdRatio);
-
-  // Update previous frames for next comparison
-  previous_frames.clear();
-  for (const auto &frame : current_frames)
+  if (debug_display && result.motion_detected)
   {
-    previous_frames.push_back(frame.clone());
+    log_debug("Motion detected on frame");
   }
-
-  // Save motion frames in debug mode (if needed)
-  if (debug_display && motion_detected)
-  {
-    // Could add debug frame saving here if needed
-    log_debug("Motion detected");
-  }
-
-  return motion_detected;
-}
-
-string Scorer::detect_score()
-{
-  // Step 1: Capture frames from all cameras (use averaging for better quality)
-  vector<Mat> frames = camera::captureAndAverageFrames(cameras, width, height, fps, frameParams.detectionFrames);
-
-  if (frames.empty())
-  {
-    cerr << "No frames captured from any camera" << endl;
-    return "";
-  }
-
-  // Step 2: Detect motion between frames
-  bool motion = detectMotion(frames);
-
-  // State machine for dart detection
-  auto now = chrono::steady_clock::now();
-
-  switch (detection_state)
-  {
-  case DetectionState::WAITING_FOR_THROW:
-    if (motion)
-    {
-      detection_state = DetectionState::MOTION_DETECTED;
-      last_motion_time = now;
-    }
-    break;
-
-  case DetectionState::MOTION_DETECTED:
-    // If motion has stopped for a certain period, we might have a dart
-    if (!motion && chrono::duration_cast<chrono::milliseconds>(now - last_motion_time).count() > motionParams.motionStabilizeMs)
-    {
-      detection_state = DetectionState::DART_DETECTED;
-
-      // Check if we should stop
-      if (!running)
-        return "";
-
-      // Pass raw frames to detector and get score
-      string score = "MISS"; // Default to miss
-
-      if (detector && detector->isInitialized())
-      {
-        // Let the detector handle everything else
-        std::vector<DartDetection> detections = detector->detectDarts(frames);
-
-        // Use the detector's score if available
-        if (!detections.empty() && !detections[0].score.empty())
-        {
-          score = detections[0].score;
-        }
-      }
-
-      // Reset for next throw
-      detection_state = DetectionState::WAITING_FOR_THROW;
-      return score;
-    }
-    else if (motion)
-    {
-      // Update the last motion time if we're still seeing motion
-      last_motion_time = now;
-    }
-    break;
-
-  case DetectionState::DART_DETECTED:
-    if (motion)
-    {
-      detection_state = DetectionState::WAITING_FOR_THROW;
-      return "END";
-    }
-    break;
-  }
-
-  return ""; // No score to report yet
-}
-
-// This simulates the computer vision thread that would detect darts
-void Scorer::vision_thread_func()
-{
-  log_info("Vision thread started");
-
-  while (running)
-  {
-    // Try to detect a dart score (this now includes real camera capture)
-    string score = detect_score();
-
-    // If we got a score, update it
-    if (!score.empty())
-    {
-      setNewScore(score);
-    }
-
-    // Small delay to control frame rate
-    this_thread::sleep_for(chrono::milliseconds(1000 / fps));
-  }
-
-  log_info("Vision thread stopped");
 }
 
 void Scorer::run()
 {
-
-  if (detector->isInitialized() == false)
+  if (!detector->isInitialized())
   {
-    log_error("Detector is not initialized. Cannot run scorer. Please check your camera setup.");
-
-    int attempts = 0;      // Try to wait for cameras to be set up
-    int max_attempts = 50; // Try for 50 attempts
-
-    while (attempts < max_attempts)
-    {
-
-      log_warning("Will attempt to initialize again in 1 minutes... Attempt " + log_string(attempts + 1) + "/" + log_string(max_attempts));
-      this_thread::sleep_for(chrono::seconds(60)); // Wait 1 minutes between attempts
-
-      // try to reinitialize the detector
-      if (detector->initialize(cameras))
-      {
-        break;
-      }
-
-      attempts++;
-    }
-
-    if (attempts >= max_attempts)
-    {
-      log_error("Failed to initialize detector after " + log_string(max_attempts) + " attempts. Exiting.");
-      return; // Exit if we can't initialize
-    }
+    log_error("Detector not initialized - cannot run");
+    return;
   }
 
-  // Set the running flag
   running = true;
+  log_info("Scorer running with " + to_string(camera_sources.size()) + " cameras");
+  log_info("Using detector: " + detector_type_name);
 
-  // Start the vision thread that will simulate detections
-  vision_thread = thread(&Scorer::vision_thread_func, this);
-
-  // Print startup message
-  log_info("Scorer running with " + log_string(camera_sources.size()) + " cameras");
-
-  // Main loop - check for and print new scores
   while (running)
   {
-    string new_score;
+    // 1. Capture frames
+    vector<Mat> frames = camera::captureFrames(cameras, width, height);
 
-    // Check for new scores using our helper method
-    if (getNewScoreIfAvailable(new_score))
+    if (frames.empty())
     {
-      log_info(new_score);
+      log_warning("No frames captured, retrying...");
+      this_thread::sleep_for(chrono::milliseconds(100));
+      continue;
     }
 
-    // Small sleep to avoid busy waiting - increase to 100ms
-    // Human perception is ~10Hz, so 100ms is still very responsive
-    // while reducing CPU usage compared to 50ms
-    this_thread::sleep_for(chrono::milliseconds(100));
+    // 2. Process frames (detector handles motion + detection internally)
+    DetectorResult result = detector->process(frames);
+
+    // 3. Send result if something detected
+    if (result)
+    { // Uses implicit bool conversion
+      sendResult(result);
+    }
+
+    // 4. Frame rate control (~15 FPS)
+    this_thread::sleep_for(chrono::milliseconds(66));
   }
+
+  log_info("Scorer stopped");
 }

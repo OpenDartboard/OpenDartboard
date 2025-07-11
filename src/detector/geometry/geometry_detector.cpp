@@ -87,15 +87,8 @@ bool GeometryDetector::initialize(vector<VideoCapture> &cameras)
     return initialized;
 }
 
-// main function for detecting darts in the provided frames
-vector<DartDetection> GeometryDetector::detectDarts(const vector<cv::Mat> &frames)
+vector<GeometryDetector::DartDetection> GeometryDetector::detectDarts(const vector<cv::Mat> &frames)
 {
-    // Calibrate if needed
-    if (!calibrated)
-    {
-        log_error("Detector not calibrated, performing calibration...");
-        return {};
-    }
 
     // Process each camera frame to find darts
     vector<DartDetection> all_detections;
@@ -123,7 +116,7 @@ vector<DartDetection> GeometryDetector::detectDarts(const vector<cv::Mat> &frame
 }
 
 // Detect darts using background subtraction and contour analysis
-vector<DartDetection> GeometryDetector::findDarts(const Mat &frame, const Mat &background, int camIndex)
+vector<GeometryDetector::DartDetection> GeometryDetector::findDarts(const Mat &frame, const Mat &background, int camIndex)
 {
     if (frame.empty() || background.empty())
         return {};
@@ -300,4 +293,79 @@ std::string GeometryDetector::calculateScore(
 
     // TODO: the fueture of this code is to calculate the score of a dart throw
     // Check if dart position is valid
+}
+
+// Select the best detection based on score and confidence
+GeometryDetector::DartDetection GeometryDetector::selectBestDetection(const vector<DartDetection> &detections)
+{
+    return *max_element(detections.begin(), detections.end(),
+                        [](const DartDetection &a, const DartDetection &b)
+                        {
+                            return a.confidence < b.confidence;
+                        });
+}
+
+// Main process method - handles motion detection + dart detection
+DetectorResult GeometryDetector::process(const vector<Mat> &frames)
+{
+    auto start_time = chrono::steady_clock::now();
+    DetectorResult result;
+    result.timestamp = chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now().time_since_epoch()).count();
+
+    if (!calibrated || frames.empty())
+    {
+        return result;
+    }
+
+    bool motion = false;
+    if (previous_frames.size() != frames.size())
+    {
+        // Initialize previous frames
+        previous_frames = frames; // Direct assignment
+    }
+    else
+    {
+        // Use camera utility for motion detection
+        motion = camera::detectMotion(frames, previous_frames, 0.05);
+        previous_frames = frames; // Update for next time
+    }
+
+    result.motion_detected = motion;
+
+    auto now = chrono::steady_clock::now();
+
+    if (motion)
+    {
+        last_motion_time = now;
+        waiting_for_dart_detection = true;
+    }
+    else if (waiting_for_dart_detection)
+    {
+        auto silence = chrono::duration_cast<chrono::milliseconds>(now - last_motion_time).count();
+        if (silence > 500) // 500ms of no motion
+        {
+            waiting_for_dart_detection = false;
+
+            // Detect dart!
+            vector<DartDetection> detections = detectDarts(frames);
+            if (!detections.empty())
+            {
+                // Select best detection
+                DartDetection bestDetection = selectBestDetection(detections);
+
+                result.dart_detected = true;
+                result.score = bestDetection.score;
+                result.position = Point2f(bestDetection.position.x, bestDetection.position.y);
+                result.confidence = bestDetection.confidence;
+                result.camera_index = bestDetection.camera_index;
+                log_debug("Dart detected: " + result.score);
+            }
+        }
+    }
+
+    // Calculate processing time
+    auto end_time = chrono::steady_clock::now();
+    result.processing_time_ms = chrono::duration_cast<chrono::milliseconds>(end_time - start_time).count();
+
+    return result;
 }
