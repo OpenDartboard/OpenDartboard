@@ -28,11 +28,41 @@ opendartboard --detector=myCoolDetector
 
 ## Creating Custom Detectors
 
-### 1. Implement the Interface
+### 1. Define the Interface
+
+Your detector must implement this interface:
+
+```cpp
+// detector_interface.hpp (copy this to your project)
+struct DetectorResult {
+    bool dart_detected = false;
+    std::string score = "";
+    cv::Point2f position{-1, -1};  // Dart position for overlay
+    float confidence = 0.0f;
+    int camera_index = -1;
+    uint64_t timestamp = 0;
+
+    // Metadata
+    bool motion_detected = false;
+    int processing_time_ms = 0;
+
+    // Easy boolean check
+    operator bool() const { return dart_detected; }
+};
+
+class DetectorInterface {
+public:
+    virtual ~DetectorInterface() = default;
+    virtual bool initialize(std::vector<cv::VideoCapture>& cameras) = 0;
+    virtual bool isInitialized() const = 0;
+    virtual DetectorResult process(const std::vector<cv::Mat>& frames) = 0;
+};
+```
+
+### 2. Implement Your Detector
 
 ```cpp
 // myCoolDetector.hpp
-#pragma once
 #include "detector_interface.hpp"
 
 class MyCoolDetector : public DetectorInterface {
@@ -42,17 +72,17 @@ public:
 
     virtual bool initialize(std::vector<cv::VideoCapture>& cameras) override;
     virtual bool isInitialized() const override;
-    virtual std::vector<DartDetection> detectDarts(const std::vector<cv::Mat>& frames) override;
+    virtual DetectorResult process(const std::vector<cv::Mat>& frames) override;
 
 private:
-    bool initialized;
+    bool initialized = false;
     bool debug_mode;
     int target_width, target_height, target_fps;
     // Your custom detector state here
 };
 ```
 
-### 2. Implement the Factory Function
+### 3. Implement Your Logic
 
 ```cpp
 // myCoolDetector.cpp
@@ -64,9 +94,7 @@ extern "C" DetectorInterface* create_detector(bool debug_mode, int width, int he
 }
 
 MyCoolDetector::MyCoolDetector(bool debug_mode, int width, int height, int fps)
-    : initialized(false), debug_mode(debug_mode),
-      target_width(width), target_height(height), target_fps(fps) {
-    // Initialize your detector
+    : debug_mode(debug_mode), target_width(width), target_height(height), target_fps(fps) {
 }
 
 bool MyCoolDetector::initialize(std::vector<cv::VideoCapture>& cameras) {
@@ -76,88 +104,98 @@ bool MyCoolDetector::initialize(std::vector<cv::VideoCapture>& cameras) {
     return true;
 }
 
-std::vector<DartDetection> MyCoolDetector::detectDarts(const std::vector<cv::Mat>& frames) {
-    std::vector<DartDetection> detections;
+bool MyCoolDetector::isInitialized() const {
+    return initialized;
+}
 
-    // Your dart detection logic here
-    // Process frames and return detections
+DetectorResult MyCoolDetector::process(const std::vector<cv::Mat>& frames) {
+    auto start_time = std::chrono::steady_clock::now();
+    DetectorResult result;
+    result.timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
 
-    return detections;
+    if (!initialized || frames.empty()) {
+        return result;
+    }
+
+    // YOUR DETECTION LOGIC HERE
+    // Analyze frames and detect dart
+
+    // Example: Simple template matching
+    if (/* dart detected */) {
+        result.dart_detected = true;
+        result.score = "S20";  // Your calculated score
+        result.position = cv::Point2f(320, 240);  // Dart position
+        result.confidence = 0.95f;  // Detection confidence
+        result.camera_index = 0;  // Which camera detected it
+    }
+
+    // Calculate processing time
+    auto end_time = std::chrono::steady_clock::now();
+    result.processing_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        end_time - start_time).count();
+
+    return result;
 }
 ```
 
-### 3. Build as Shared Library
-
-#### Simple Plugin (single file):
+### 4. Build as Shared Library
 
 ```bash
-g++ -shared -fPIC -I/path/to/opendartboard/src \
+# Simple build
+g++ -shared -fPIC \
   myCoolDetector.cpp \
   -lopencv_core -lopencv_imgproc \
   -o detectors/myCoolDetector.so
-```
 
-#### Complex Plugin (multiple files):
-
-```bash
-# Build all components into one shared library
-g++ -shared -fPIC -I/path/to/opendartboard/src \
+# Or with folder structure
+mkdir -p detectors/MyCoolDetector
+g++ -shared -fPIC \
   myCoolDetector.cpp \
   advanced_algo.cpp \
-  helper_utils.cpp \
-  -lopencv_core -lopencv_imgproc -lopencv_imgcodecs \
+  -lopencv_core -lopencv_imgproc \
   -ltensorflow \
-  -o detectors/myCoolDetector/libmyCoolDetector.so
+  -o detectors/MyCoolDetector/libMyCoolDetector.so
 ```
 
 ## Plugin Directory Structure
 
-### Simple Plugin Layout:
+### Simple Layout:
 
 ```
 detectors/
-├── libmyCoolDetector.so     # Single shared library
-├── libAwesomeDetector.so    # Another simple plugin
-└── libSuperDetector.so      # Yet another plugin
+├── libmyCoolDetector.so
+├── libAwesomeDetector.so
+└── libSuperDetector.so
 ```
 
-### Advanced Plugin Layout:
+### Advanced Layout:
 
 ```
 detectors/
 ├── MyCoolDetector/
-│   ├── libMyCoolDetector.so  # Main plugin library
+│   ├── libMyCoolDetector.so
 │   ├── models/
-│   │   ├── dartboard.pb      # TensorFlow model
-│   │   └── calibration.yaml  # Configuration
-│   ├── lib/
-│   │   ├── opencv_utils.so   # Helper libraries
-│   │   └── ai_engine.so      # AI inference engine
-│   ├── config.json           # Plugin configuration
-│   └── README.md             # Plugin documentation
-├── AwesomeDetector/
-│   ├── libAwesomeDetector.so
-│   ├── yolo_weights.bin
-│   └── config.json
-└── SuperDetector/
-    ├── libSuperDetector.so
-    ├── custom_model.onnx
-    └── README.md
+│   │   └── dartboard_model.pb
+│   ├── config.json
+│   └── README.md
+└── AwesomeDetector/
+    ├── libAwesomeDetector.so
+    └── yolo_weights.bin
 ```
 
-## Example Plugins
+## Example Detectors
 
-### 1. YOLO-based Detector
+### YOLO-based Detector
 
 ```cpp
-// YOLODetector.cpp
 #include "detector_interface.hpp"
 #include <opencv2/dnn.hpp>
 
 class YOLODetector : public DetectorInterface {
 private:
     cv::dnn::Net net;
-    bool initialized;
+    bool initialized = false;
 
 public:
     YOLODetector(bool debug, int w, int h, int fps) : initialized(false) {
@@ -171,14 +209,34 @@ public:
         return initialized;
     }
 
-    std::vector<DartDetection> detectDarts(const std::vector<cv::Mat>& frames) override {
-        // YOLO detection logic
-        std::vector<DartDetection> detections;
-        for (const auto& frame : frames) {
-            // Run YOLO inference
-            // Convert to DartDetection format
+    bool isInitialized() const override {
+        return initialized;
+    }
+
+    DetectorResult process(const std::vector<cv::Mat>& frames) override {
+        DetectorResult result;
+
+        for (size_t i = 0; i < frames.size(); i++) {
+            // YOLO inference
+            cv::Mat blob;
+            cv::dnn::blobFromImage(frames[i], blob, 1/255.0, cv::Size(416, 416));
+            net.setInput(blob);
+
+            std::vector<cv::Mat> outputs;
+            net.forward(outputs, net.getUnconnectedOutLayersNames());
+
+            // Process YOLO output
+            if (/* dart detected */) {
+                result.dart_detected = true;
+                result.score = "T20";
+                result.position = cv::Point2f(/* x, y */);
+                result.confidence = /* confidence */;
+                result.camera_index = i;
+                break;
+            }
         }
-        return detections;
+
+        return result;
     }
 };
 
@@ -187,13 +245,13 @@ extern "C" DetectorInterface* create_detector(bool debug, int w, int h, int fps)
 }
 ```
 
-### 2. OpenCV Template Matching Detector
+### Template Matching Detector
 
 ```cpp
-// TemplateDetector.cpp
 class TemplateDetector : public DetectorInterface {
 private:
     cv::Mat dartTemplate;
+    bool initialized = false;
 
 public:
     TemplateDetector(bool debug, int w, int h, int fps) {
@@ -201,57 +259,32 @@ public:
         dartTemplate = cv::imread("detectors/Template/dart_template.jpg", 0);
     }
 
-    std::vector<DartDetection> detectDarts(const std::vector<cv::Mat>& frames) override {
-        std::vector<DartDetection> detections;
+    DetectorResult process(const std::vector<cv::Mat>& frames) override {
+        DetectorResult result;
 
         for (size_t i = 0; i < frames.size(); i++) {
             cv::Mat gray;
             cv::cvtColor(frames[i], gray, cv::COLOR_BGR2GRAY);
 
-            cv::Mat result;
-            cv::matchTemplate(gray, dartTemplate, result, cv::TM_CCOEFF_NORMED);
+            cv::Mat matchResult;
+            cv::matchTemplate(gray, dartTemplate, matchResult, cv::TM_CCOEFF_NORMED);
 
             double minVal, maxVal;
             cv::Point minLoc, maxLoc;
-            cv::minMaxLoc(result, &minVal, &maxVal, &minLoc, &maxLoc);
+            cv::minMaxLoc(matchResult, &minVal, &maxVal, &minLoc, &maxLoc);
 
-            if (maxVal > 0.8) {  // Threshold
-                DartDetection detection;
-                detection.position = maxLoc;
-                detection.confidence = maxVal;
-                detection.camera_index = i;
-                detection.score = "TEMPLATE_HIT";
-                detections.push_back(detection);
+            if (maxVal > 0.8) {
+                result.dart_detected = true;
+                result.position = cv::Point2f(maxLoc.x, maxLoc.y);
+                result.confidence = maxVal;
+                result.camera_index = i;
+                result.score = "S16";
+                break;
             }
         }
 
-        return detections;
+        return result;
     }
-};
-```
-
-## Data Structures
-
-### DartDetection
-
-```cpp
-struct DartDetection {
-    cv::Point position;       // Dart position in image
-    float confidence;         // Detection confidence (0.0 - 1.0)
-    std::string score;        // Calculated score (e.g., "20", "BULL", "MISS")
-    int camera_index;         // Which camera detected this
-};
-```
-
-### DetectorInterface
-
-```cpp
-class DetectorInterface {
-public:
-    virtual ~DetectorInterface() = default;
-    virtual bool initialize(std::vector<cv::VideoCapture>& cameras) = 0;
-    virtual bool isInitialized() const = 0;
-    virtual std::vector<DartDetection> detectDarts(const std::vector<cv::Mat>& frames) = 0;
 };
 ```
 
@@ -279,6 +312,22 @@ opendartboard --detector=MyCoolDetector --debug
 # "Successfully loaded custom detector: MyCoolDetector"
 ```
 
+## How It Works
+
+1. **OpenDartboard calls your detector**: `DetectorResult result = detector->process(frames)`
+2. **Your detector analyzes frames**: Use any computer vision techniques you want
+3. **Return rich result data**: Position, score, confidence, etc.
+4. **OpenDartboard handles the rest**: WebSocket communication, game logic, etc.
+
+Your detector doesn't need to know about:
+
+- WebSocket protocols
+- Game state management
+- Camera initialization
+- Frame rate control
+
+Just focus on: **frames in → dart detection out**
+
 ## Error Handling
 
 If plugin loading fails, OpenDartboard will:
@@ -286,14 +335,12 @@ If plugin loading fails, OpenDartboard will:
 1. Try multiple file locations
 2. Log detailed error messages
 3. Fall back to geometry detector
-4. Continue running normally
 
 Common issues:
 
 - Missing `create_detector` function
 - Incorrect library dependencies
 - Permission issues
-- Missing include paths
 
 ## Advanced Features
 
@@ -308,8 +355,7 @@ Common issues:
   "description": "Advanced dart detection using custom algorithms",
   "dependencies": ["opencv >= 4.0", "tensorflow >= 2.0"],
   "parameters": {
-    "confidence_threshold": 0.8,
-    "nms_threshold": 0.4
+    "confidence_threshold": 0.8
   }
 }
 ```
@@ -317,12 +363,17 @@ Common issues:
 ### Multi-library Plugins
 
 ```cpp
-// In your main plugin, load additional libraries
+// Load additional libraries in your detector
 void* helper_lib = dlopen("detectors/MyCoolDetector/helper.so", RTLD_LAZY);
-typedef void (*init_helper_t)();
-init_helper_t init_helper = (init_helper_t) dlsym(helper_lib, "init_helper");
-init_helper();
 ```
+
+Your detector has complete freedom to:
+
+- Use any AI frameworks (TensorFlow, PyTorch, ONNX)
+- Load additional shared libraries
+- Use any computer vision techniques
+- Implement custom calibration logic
+- Handle multiple cameras however you want
 
 ## Future Plugin Repository
 
@@ -331,6 +382,5 @@ We plan to create a plugin repository where developers can:
 - Share detector plugins
 - Download community detectors
 - Rate and review plugins
-- Automatic dependency management
 
-Stay tuned for updates! 🚀
+Stay tuned for updates!
