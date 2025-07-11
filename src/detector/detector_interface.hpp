@@ -6,12 +6,22 @@
 using namespace cv;
 using namespace std;
 
-struct DartDetection
+// Result structure with all detection data
+struct DetectorResult
 {
-    cv::Point position;   // Position of the dart tip
-    float confidence;     // How confident we are (0-1)
-    std::string score;    // The detected score (e.g., "D20", "S5")
-    int camera_index = 0; // Which camera detected this dart
+    bool dart_detected = false;
+    string score = "";
+    Point2f position{-1, -1}; // Dart position for overlay/preview
+    float confidence = 0.0f;
+    int camera_index = -1;
+    uint64_t timestamp = 0;
+
+    // Metadata for debugging/analysis
+    bool motion_detected = false;
+    int processing_time_ms = 0;
+
+    // Easy boolean check
+    operator bool() const { return dart_detected; }
 };
 
 // Abstract interface for any dart detection method
@@ -23,9 +33,9 @@ public:
     // Initialize the detector
     virtual bool initialize(vector<VideoCapture> &cameras) = 0;
 
-    // Process frames and return detected darts
-    virtual vector<DartDetection> detectDarts(const vector<Mat> &frames) = 0;
-
     // Whether the detector is ready
     virtual bool isInitialized() const = 0;
+
+    // Process frames and return detection results
+    virtual DetectorResult process(const vector<Mat> &frames) = 0;
 };
