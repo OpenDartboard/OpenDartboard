@@ -16,7 +16,19 @@ public:
 
     virtual bool initialize(vector<VideoCapture> &cameras) override;
     virtual bool isInitialized() const override { return initialized; }
-    virtual vector<DartDetection> detectDarts(const vector<Mat> &frames) override;
+
+    // Process method that handles motion + detection
+    virtual DetectorResult process(const vector<Mat> &frames) override;
+
+private:
+    // Internal detection structure - moved from public interface
+    struct DartDetection
+    {
+        Point position;
+        float confidence;
+        string score;
+        int camera_index;
+    };
 
 protected:
     bool initialized;
@@ -28,8 +40,14 @@ protected:
     vector<DartboardCalibration> calibrations;
     vector<Mat> background_frames;
 
-    // Detector methods - removed calibrateDartboard
+    // Simple motion detection state (no complex state machine)
+    vector<Mat> previous_frames;
+    chrono::steady_clock::time_point last_motion_time;
+    bool waiting_for_dart_detection = false;
+
+    vector<DartDetection> detectDarts(const vector<Mat> &frames);
     vector<DartDetection> findDarts(const Mat &frame, const Mat &background, int camIndex);
     Mat preprocessFrame(const Mat &frame, bool preserveColor = false);
     string calculateScore(const Point &dartPosition, const DartboardCalibration &calib);
+    DartDetection selectBestDetection(const vector<DartDetection> &detections);
 };
