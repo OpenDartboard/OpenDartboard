@@ -87,11 +87,10 @@ bool GeometryDetector::initialize(vector<VideoCapture> &cameras)
     return initialized;
 }
 
-vector<GeometryDetector::DartDetection> GeometryDetector::detectDarts(const vector<cv::Mat> &frames)
+vector<DetectorResult> GeometryDetector::detectDarts(const vector<cv::Mat> &frames)
 {
-
     // Process each camera frame to find darts
-    vector<DartDetection> all_detections;
+    vector<DetectorResult> all_detections;
 
     for (size_t i = 0; i < frames.size() && i < calibrations.size(); i++)
     {
@@ -102,7 +101,7 @@ vector<GeometryDetector::DartDetection> GeometryDetector::detectDarts(const vect
         // Find darts in this camera's frame
         Mat curr_processed = preprocessFrame(frames[i]);
         Mat bg_processed = preprocessFrame(background_frames[i]);
-        vector<DartDetection> camera_detections = findDarts(curr_processed, bg_processed, i);
+        vector<DetectorResult> camera_detections = findDarts(curr_processed, bg_processed, i);
 
         // Set camera index for each detection
         for (auto &det : camera_detections)
@@ -116,7 +115,7 @@ vector<GeometryDetector::DartDetection> GeometryDetector::detectDarts(const vect
 }
 
 // Detect darts using background subtraction and contour analysis
-vector<GeometryDetector::DartDetection> GeometryDetector::findDarts(const Mat &frame, const Mat &background, int camIndex)
+vector<DetectorResult> GeometryDetector::findDarts(const Mat &frame, const Mat &background, int camIndex)
 {
     if (frame.empty() || background.empty())
         return {};
@@ -151,7 +150,7 @@ vector<GeometryDetector::DartDetection> GeometryDetector::findDarts(const Mat &f
     findContours(thresh, contours, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE);
 
     // Process contours to find dart candidates
-    vector<DartDetection> all_detections;
+    vector<DetectorResult> all_detections;
 
     // Debug frame for visualization
     Mat debug_frame;
@@ -206,11 +205,13 @@ vector<GeometryDetector::DartDetection> GeometryDetector::findDarts(const Mat &f
             double dist_to_center = math::distanceToPoint(best_point, closest_calib->bullCenter);
             if (dist_to_center <= radius * 1.5)
             {
-                // Create detection
-                DartDetection detection;
-                detection.position = best_point;
+                // Create detection using DetectorResult directly - no helper needed!
+                DetectorResult detection;
+                detection.dart_detected = true;
+                detection.position = Point2f(best_point.x, best_point.y); // Convert to Point2f
                 detection.confidence = 0.9 - (dist_to_center / (radius * 2.0));
                 detection.score = calculateScore(best_point, *closest_calib);
+                detection.camera_index = camIndex; // Set directly
                 all_detections.push_back(detection);
 
                 // Debug: Mark valid detections
@@ -231,9 +232,9 @@ vector<GeometryDetector::DartDetection> GeometryDetector::findDarts(const Mat &f
     }
 
     // Remove duplicates
-    vector<DartDetection> filtered_detections;
+    vector<DetectorResult> filtered_detections;
     sort(all_detections.begin(), all_detections.end(),
-         [](const DartDetection &a, const DartDetection &b)
+         [](const DetectorResult &a, const DetectorResult &b)
          {
              return a.confidence > b.confidence;
          });
@@ -244,7 +245,7 @@ vector<GeometryDetector::DartDetection> GeometryDetector::findDarts(const Mat &f
         bool is_duplicate = false;
         for (const auto &accepted : filtered_detections)
         {
-            if (math::distanceToPoint(det.position, accepted.position) < DUPLICATE_THRESHOLD)
+            if (math::distanceToPoint(Point(det.position.x, det.position.y), Point(accepted.position.x, accepted.position.y)) < DUPLICATE_THRESHOLD)
             {
                 is_duplicate = true;
                 break;
@@ -295,11 +296,11 @@ std::string GeometryDetector::calculateScore(
     // Check if dart position is valid
 }
 
-// Select the best detection based on score and confidence
-GeometryDetector::DartDetection GeometryDetector::selectBestDetection(const vector<DartDetection> &detections)
+// Select the best detection based on confidence
+DetectorResult GeometryDetector::selectBestDetection(const vector<DetectorResult> &detections)
 {
     return *max_element(detections.begin(), detections.end(),
-                        [](const DartDetection &a, const DartDetection &b)
+                        [](const DetectorResult &a, const DetectorResult &b)
                         {
                             return a.confidence < b.confidence;
                         });
@@ -347,23 +348,21 @@ DetectorResult GeometryDetector::process(const vector<Mat> &frames)
             waiting_for_dart_detection = false;
 
             // Detect dart!
-            vector<DartDetection> detections = detectDarts(frames);
+            vector<DetectorResult> detections = detectDarts(frames);
             if (!detections.empty())
             {
-                // Select best detection
-                DartDetection bestDetection = selectBestDetection(detections);
+                DetectorResult bestDetection = selectBestDetection(detections);
 
-                result.dart_detected = true;
-                result.score = bestDetection.score;
-                result.position = Point2f(bestDetection.position.x, bestDetection.position.y);
-                result.confidence = bestDetection.confidence;
-                result.camera_index = bestDetection.camera_index;
-                log_debug("Dart detected: " + result.score);
+                // Just return it directly - it's already a DetectorResult!
+                bestDetection.motion_detected = motion;
+                bestDetection.processing_time_ms = chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - start_time).count();
+                log_debug("Dart detected: " + bestDetection.score);
+                return bestDetection;
             }
         }
     }
 
-    // Calculate processing time
+    // Calculate processing time for non-detection case
     auto end_time = chrono::steady_clock::now();
     result.processing_time_ms = chrono::duration_cast<chrono::milliseconds>(end_time - start_time).count();
 
