@@ -20,16 +20,6 @@ public:
     // Process method that handles motion + detection
     virtual DetectorResult process(const vector<Mat> &frames) override;
 
-private:
-    // Internal detection structure - moved from public interface
-    struct DartDetection
-    {
-        Point position;
-        float confidence;
-        string score;
-        int camera_index;
-    };
-
 protected:
     bool initialized;
     bool calibrated;
@@ -45,9 +35,9 @@ protected:
     chrono::steady_clock::time_point last_motion_time;
     bool waiting_for_dart_detection = false;
 
-    vector<DartDetection> detectDarts(const vector<Mat> &frames);
-    vector<DartDetection> findDarts(const Mat &frame, const Mat &background, int camIndex);
+    vector<DetectorResult> detectDarts(const vector<Mat> &frames);
+    vector<DetectorResult> findDarts(const Mat &frame, const Mat &background, int camIndex);
     Mat preprocessFrame(const Mat &frame, bool preserveColor = false);
     string calculateScore(const Point &dartPosition, const DartboardCalibration &calib);
-    DartDetection selectBestDetection(const vector<DartDetection> &detections);
+    DetectorResult selectBestDetection(const vector<DetectorResult> &detections);
 };
