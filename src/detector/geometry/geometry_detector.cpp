@@ -15,12 +15,11 @@ GeometryDetector::GeometryDetector(bool debug_mode, int target_width, int target
 
 bool GeometryDetector::initialize(vector<VideoCapture> &cameras)
 {
-
 #ifdef DEBUG_VIA_VIDEO_INPUT
-    debug_streamer = make_unique<streamer>(8080, cameras[0].get(cv::CAP_PROP_FPS));
-    cv::Mat img(target_height, target_width, CV_8UC3, cv::Scalar::all(0)); // clear to black
-    cv::putText(img, "Streamer Starting....", {50, 220}, cv::FONT_HERSHEY_SIMPLEX, 1.2, {0, 255, 0}, 2);
-    debug_streamer->push(img);
+    // Initialize multiple debug streamers
+    raw_streamer = make_unique<streamer>(8080, cameras[0].get(cv::CAP_PROP_FPS));
+    cv::Mat startup_img_raw(target_height, target_width, CV_8UC3, cv::Scalar::all(0));
+    cv::putText(startup_img_raw, "Raw Cameras", {50, 100}, cv::FONT_HERSHEY_SIMPLEX, 1.2, {0, 255, 0}, 2);
 #endif
 
     // Try to load cached calibration first
@@ -317,9 +316,12 @@ DetectorResult GeometryDetector::selectBestDetection(const vector<DetectorResult
 // Main process method - handles motion detection + dart detection
 DetectorResult GeometryDetector::process(const vector<Mat> &frames)
 {
-
 #ifdef DEBUG_VIA_VIDEO_INPUT
-    debug_streamer->push(frames[0]);
+    if (!frames.empty())
+    {
+        Mat combined_raw = debug::createCombinedFrame(frames, "RAW");
+        raw_streamer->push(combined_raw);
+    }
 #endif
 
     auto start_time = chrono::steady_clock::now();
@@ -331,6 +333,7 @@ DetectorResult GeometryDetector::process(const vector<Mat> &frames)
         return result;
     }
 
+    // Motion detection code
     bool motion = false;
     if (previous_frames.size() != frames.size())
     {
@@ -340,7 +343,7 @@ DetectorResult GeometryDetector::process(const vector<Mat> &frames)
     else
     {
         // Use camera utility for motion detection
-        motion = camera::detectMotion(frames, previous_frames, 0.05);
+        motion = camera::detectMotion(frames, previous_frames, 0.01);
         previous_frames = frames; // Update for next time
     }
 

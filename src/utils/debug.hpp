@@ -169,4 +169,37 @@ namespace debug
         return combinedImage;
     }
 
+    // Helper function to create combined frame with label
+    inline cv::Mat createCombinedFrame(const vector<Mat> &frames, const string &label)
+    {
+        if (frames.empty())
+            return cv::Mat();
+
+        int numCams = min(3, (int)frames.size());
+        int frameWidth = frames[0].cols;
+        int frameHeight = frames[0].rows;
+
+        // Horizontal layout: [Cam0][Cam1][Cam2]
+        Mat combined(frameHeight, frameWidth * numCams, frames[0].type());
+
+        for (int i = 0; i < numCams; i++)
+        {
+            if (!frames[i].empty())
+            {
+                Rect roi(i * frameWidth, 0, frameWidth, frameHeight);
+                frames[i].copyTo(combined(roi));
+
+                // Add camera and stream labels
+                putText(combined, "Camera " + to_string(i),
+                        Point(i * frameWidth + 10, 30),
+                        FONT_HERSHEY_SIMPLEX, 0.8, Scalar(0, 255, 0), 2);
+                putText(combined, label,
+                        Point(i * frameWidth + 10, 60),
+                        FONT_HERSHEY_SIMPLEX, 0.6, Scalar(255, 255, 255), 2);
+            }
+        }
+
+        return combined;
+    }
+
 } // namespace debug

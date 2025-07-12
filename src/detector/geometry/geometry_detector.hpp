@@ -42,8 +42,8 @@ protected:
     string calculateScore(const Point &dartPosition, const DartboardCalibration &calib);
     DetectorResult selectBestDetection(const vector<DetectorResult> &detections);
 
-// Debugging streamer for visual output
+// Debugging streamers for visual output
 #ifdef DEBUG_VIA_VIDEO_INPUT
-    unique_ptr<streamer> debug_streamer;
+    unique_ptr<streamer> raw_streamer; // Port 8080 - Raw camera feeds
 #endif
 };

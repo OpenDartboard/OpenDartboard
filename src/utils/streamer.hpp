@@ -67,7 +67,10 @@ public:
                 lag = std::accumulate(latencyAcc_.begin(), latencyAcc_.end(), 0) / static_cast<int>(latencyAcc_.size());
                 latencyAcc_.clear();
             }
-            std::cout << "[streamer][stats] push=" << pc << "fps, send=" << sc << "fps | lag " << lag << " ms\n";
+
+            // tempory commented out
+            // to avoid too much output in the console
+            // std::cout << "[streamer][stats] push=" << pc << "fps, send=" << sc << "fps | lag " << lag << " ms\n";
             lastReport_ = now;
         }
     }

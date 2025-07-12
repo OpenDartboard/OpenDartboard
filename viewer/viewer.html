@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>3-stream monitor</title>
+<style>
+  body{display:block;gap:8px;margin:0;background:#111}
+  img{width:100%;height:auto;background:#000; display:block;}
+</style>
+</head>
+<body>
+    <div> <img id="cam0"><br/></div>
+    <div> <img id="cam1"><br/></div>
+    <div> <img id="cam2"><br/></div>
+<script>
+const urls = [
+  "http://localhost:8080/", 
+  // "http://localhost:8081/", 
+  // "http://localhost:8082/"
+];
+
+urls.forEach((u, i) => connect(i, u));
+
+function connect(idx, url){
+  const img   = document.getElementById("cam"+idx);
+  let stamp    = Date.now();                       // cache-buster
+  img.src      = url + "?t=" + stamp;
+  // img.onerror  = () => setTimeout(()=>connect(idx,url), 1000); // retry 1 s later
+  /* optional: refresh every 30 s even if no error (handles silent drops) */
+  setTimeout(()=>connect(idx,url), 1000);
+}
+</script>
+</body>
+</html>
