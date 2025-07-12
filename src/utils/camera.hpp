@@ -68,6 +68,9 @@ namespace camera
             else
             {
                 cap.open(camera_sources[i]);
+                cap.set(CAP_PROP_FRAME_WIDTH, width);
+                cap.set(CAP_PROP_FRAME_HEIGHT, height);
+                cap.set(CAP_PROP_FPS, fps);
             }
 
             if (!cap.isOpened())
@@ -75,10 +78,6 @@ namespace camera
                 log_error("Failed to open camera/video " + camera_sources[i]);
                 return false;
             }
-
-            cap.set(CAP_PROP_FRAME_WIDTH, width);
-            cap.set(CAP_PROP_FRAME_HEIGHT, height);
-            cap.set(CAP_PROP_FPS, fps);
 
             cameras.push_back(cap);
             log_info("Camera/video " + log_string(i + 1) + " initialized successfully");
@@ -88,52 +87,48 @@ namespace camera
     }
 
     // Capture frames from all cameras with resizing if needed
-    inline vector<Mat> captureFrames(vector<VideoCapture> &cameras, int target_width, int target_height)
+    inline vector<Mat> captureFrames(vector<VideoCapture> &cameras)
     {
         vector<Mat> frames;
+        frames.reserve(cameras.size());
 
         for (size_t i = 0; i < cameras.size(); i++)
         {
             Mat frame;
             bool success = cameras[i].read(frame);
 
-            if (!success || frame.empty())
+            if (success && !frame.empty())
+            {
+                // capture frame
+                frames.push_back(frame);
+            }
+            else
             {
                 log_error("Failed to capture frame from camera " + log_string(i + 1));
                 continue;
             }
-
-            if (!frame.empty() && (frame.cols != target_width || frame.rows != target_height))
-            {
-                Mat resized;
-                resize(frame, resized, Size(target_width, target_height));
-                frames.push_back(resized);
-            }
-            else
-            {
-                frames.push_back(frame);
-            }
         }
+
+#ifdef DEBUG_VIA_VIDEO_INPUT
+        std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(1000.0 / cameras[0].get(cv::CAP_PROP_FPS))));
+#endif
 
         return frames;
     }
 
     // Capture and average multiple frames for better quality
-    inline vector<Mat> captureAndAverageFrames(vector<VideoCapture> &cameras, int target_width, int target_height, int fps, int numFrames)
+    inline vector<Mat> captureAndAverageFrames(vector<VideoCapture> &cameras, int numFrames)
     {
         vector<Mat> averagedFrames;
         vector<vector<Mat>> allFrameSets;
 
         for (int i = 0; i < numFrames; i++)
         {
-            vector<Mat> frameSet = captureFrames(cameras, target_width, target_height);
+            vector<Mat> frameSet = captureFrames(cameras);
             if (!frameSet.empty())
             {
                 allFrameSets.push_back(frameSet);
             }
-
-            int frameIntervalMs = 1000 / fps;
-            this_thread::sleep_for(chrono::milliseconds(frameIntervalMs));
         }
 
         if (allFrameSets.empty())
