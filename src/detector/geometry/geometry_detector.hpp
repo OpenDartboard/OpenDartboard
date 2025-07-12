@@ -1,9 +1,10 @@
 #pragma once
 
-#include "../detector_interface.hpp"
-#include "calibration/geometry_calibration.hpp"
 #include <opencv2/opencv.hpp>
 #include <vector>
+#include "../detector_interface.hpp"
+#include "calibration/geometry_calibration.hpp"
+#include "streamer.hpp"
 
 using namespace cv;
 using namespace std;
@@ -40,4 +41,9 @@ protected:
     Mat preprocessFrame(const Mat &frame, bool preserveColor = false);
     string calculateScore(const Point &dartPosition, const DartboardCalibration &calib);
     DetectorResult selectBestDetection(const vector<DetectorResult> &detections);
+
+// Debugging streamer for visual output
+#ifdef DEBUG_VIA_VIDEO_INPUT
+    unique_ptr<streamer> debug_streamer;
+#endif
 };

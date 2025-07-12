@@ -17,6 +17,12 @@ namespace cache
     namespace geometry
     {
 
+        // @IMPORTANT -----------
+        // TODO: check if cahce matches the current width and height
+        // else we will get a crash when trying to use these frames
+        // for now just delete the cache if you getting a crash
+        // @IMPORTANT -----------
+
         static const uint32_t MAGIC = 0x42554C4C; // "BULL" in ASCII
         static const uint32_t VERSION = 1;
 

@@ -78,26 +78,17 @@ void Scorer::run()
   while (running)
   {
     // 1. Capture frames
-    vector<Mat> frames = camera::captureFrames(cameras, width, height);
-
-    if (frames.empty())
+    vector<cv::Mat> frames = camera::captureFrames(cameras);
+    if (!frames.empty())
     {
-      log_warning("No frames captured, retrying...");
-      this_thread::sleep_for(chrono::milliseconds(100));
-      continue;
+      // 2. Process frames by the detector
+      DetectorResult result = detector->process(frames);
+      // 3. Send result if something detected
+      if (result)
+      {
+        sendResult(result);
+      }
     }
-
-    // 2. Process frames (detector handles motion + detection internally)
-    DetectorResult result = detector->process(frames);
-
-    // 3. Send result if something detected
-    if (result)
-    { // Uses implicit bool conversion
-      sendResult(result);
-    }
-
-    // 4. Frame rate control (~15 FPS)
-    this_thread::sleep_for(chrono::milliseconds(66));
   }
 
   log_info("Scorer stopped");

@@ -15,6 +15,14 @@ GeometryDetector::GeometryDetector(bool debug_mode, int target_width, int target
 
 bool GeometryDetector::initialize(vector<VideoCapture> &cameras)
 {
+
+#ifdef DEBUG_VIA_VIDEO_INPUT
+    debug_streamer = make_unique<streamer>(8080, cameras[0].get(cv::CAP_PROP_FPS));
+    cv::Mat img(target_height, target_width, CV_8UC3, cv::Scalar::all(0)); // clear to black
+    cv::putText(img, "Streamer Starting....", {50, 220}, cv::FONT_HERSHEY_SIMPLEX, 1.2, {0, 255, 0}, 2);
+    debug_streamer->push(img);
+#endif
+
     // Try to load cached calibration first
     calibrations = cache::geometry::load();
     if (!calibrations.empty())
@@ -32,7 +40,7 @@ bool GeometryDetector::initialize(vector<VideoCapture> &cameras)
     }
 
     log_info("Capturing frames for calibration...");
-    vector<Mat> initial_frames = camera::captureAndAverageFrames(cameras, target_width, target_height, target_fps, 75); // Capture 75 frames for averaging
+    vector<Mat> initial_frames = camera::captureAndAverageFrames(cameras, 75); // Capture 75 frames for averaging
 
     if (!initial_frames.empty())
     {
@@ -309,6 +317,11 @@ DetectorResult GeometryDetector::selectBestDetection(const vector<DetectorResult
 // Main process method - handles motion detection + dart detection
 DetectorResult GeometryDetector::process(const vector<Mat> &frames)
 {
+
+#ifdef DEBUG_VIA_VIDEO_INPUT
+    debug_streamer->push(frames[0]);
+#endif
+
     auto start_time = chrono::steady_clock::now();
     DetectorResult result;
     result.timestamp = chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now().time_since_epoch()).count();
