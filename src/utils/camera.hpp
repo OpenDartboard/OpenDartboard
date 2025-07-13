@@ -48,7 +48,7 @@ namespace camera
                 cap.open(camera_sources[i]);
 
 #ifdef DEBUG_SEEK_VIDEO
-                int seek_seconds = 5;
+                double seek_seconds = 3 - (i * 0.18); // Example: seek 4 seconds for first video, 3 for second, etc.
                 if (seek_seconds > 0 && cap.isOpened())
                 {
                     double video_fps = cap.get(CAP_PROP_FPS);
@@ -110,7 +110,7 @@ namespace camera
         }
 
 #ifdef DEBUG_VIA_VIDEO_INPUT
-        std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(1000.0 / cameras[0].get(cv::CAP_PROP_FPS))));
+        std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(1000.0 / 30)));
 #endif
 
         return frames;
