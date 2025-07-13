@@ -95,7 +95,6 @@ DetectorResult GeometryDetector::process(const vector<Mat> &frames)
 
     // Check if we have any motions detected in any of the frames (cameras)
     vector<bool> motions = GeometryDetector::detectMotion(frames);
-
     auto now = chrono::steady_clock::now();
 
     // Check if any camera detects motion this frame
@@ -116,7 +115,7 @@ DetectorResult GeometryDetector::process(const vector<Mat> &frames)
     }
     else if (any_motion_this_frame && !is_moving && in_cooldown)
     {
-        // cout << "DEBUG: Motion detected but in cooldown period (" << cooldown_elapsed << "ms/" << COOLDOWN_PERIOD_MS << "ms)" << endl;
+        cout << "DEBUG: Motion detected but in cooldown period (" << cooldown_elapsed << "ms/" << COOLDOWN_PERIOD_MS << "ms)" << endl;
     }
 
     if (is_moving)
@@ -142,25 +141,25 @@ DetectorResult GeometryDetector::process(const vector<Mat> &frames)
         int total_cameras = motions.size();
 
         // DEBUG: Show which specific cameras are moving and which participated
-        // cout << "DEBUG: duration=" << session_duration << "ms";
-        // cout << " | Currently moving: ";
-        // for (size_t i = 0; i < are_moving.size(); i++)
-        // {
-        //     if (are_moving[i])
-        //         cout << "cam" << i << " ";
-        // }
-        // cout << " | Participated: ";
-        // for (size_t i = 0; i < was_moving_in_session.size(); i++)
-        // {
-        //     if (was_moving_in_session[i])
-        //         cout << "cam" << i << " ";
-        // }
-        // cout << " | Total: " << cameras_that_moved << "/" << total_cameras;
+        cout << "DEBUG: duration=" << session_duration << "ms";
+        cout << " | Currently moving: ";
+        for (size_t i = 0; i < are_moving.size(); i++)
+        {
+            if (are_moving[i])
+                cout << "cam" << i << " ";
+        }
+        cout << " | Participated: ";
+        for (size_t i = 0; i < was_moving_in_session.size(); i++)
+        {
+            if (was_moving_in_session[i])
+                cout << "cam" << i << " ";
+        }
+        cout << " | Total: " << cameras_that_moved << "/" << total_cameras;
 
         // Check success condition FIRST (before timeout)
         if (any_left_moving == 0 && cameras_that_moved == total_cameras)
         {
-            // cout << " -> ENDING SESSION (success)" << endl;
+            cout << " -> ENDING SESSION (success)" << endl;
             log_debug("Motion session ended (all cameras participated and stopped) - duration: " + to_string(session_duration) + "ms, cameras participated: " + to_string(cameras_that_moved) + "/" + to_string(total_cameras));
             is_moving = false;
             last_session_end_time = now; // Start cooldown period
@@ -168,7 +167,7 @@ DetectorResult GeometryDetector::process(const vector<Mat> &frames)
         }
         else if (session_duration >= MAX_MOTION_SESSION_MS)
         {
-            // cout << " -> ENDING SESSION (timeout)" << endl;
+            cout << " -> ENDING SESSION (timeout)" << endl;
             log_debug("Motion session ended (maximum timeout reached) - duration: " + to_string(session_duration) + "ms, cameras participated: " + to_string(cameras_that_moved) + "/" + to_string(total_cameras));
             is_moving = false;
             last_session_end_time = now; // Start cooldown period
@@ -210,7 +209,7 @@ bool GeometryDetector::initialize(vector<VideoCapture> &cameras)
     }
 
     log_info("Capturing frames for calibration...");
-    vector<Mat> initial_frames = camera::captureAndAverageFrames(cameras, 75); // Capture 75 frames for averaging
+    vector<Mat> initial_frames = camera::captureAndAverageFrames(cameras, 30); // Capture 75 frames for averaging
 
     if (!initial_frames.empty())
     {

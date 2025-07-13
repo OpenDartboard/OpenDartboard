@@ -38,8 +38,8 @@ protected:
     // Motion session timing
     chrono::steady_clock::time_point motion_session_start_time;
     chrono::steady_clock::time_point last_session_end_time;
-    const int MAX_MOTION_SESSION_MS = 2000; // Force end after 5 seconds
-    const int COOLDOWN_PERIOD_MS = 2300;    // Wait 500ms after session ends before allowing new session
+    const int MAX_MOTION_SESSION_MS = 2000; // Force end after 2 seconds
+    const int COOLDOWN_PERIOD_MS = 2300;    // Wait 2.3s after session ends before allowing new session
 
     vector<bool> detectMotion(const vector<Mat> &frames);
 
