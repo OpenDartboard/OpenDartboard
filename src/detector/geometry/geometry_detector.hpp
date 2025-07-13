@@ -28,19 +28,20 @@ protected:
     int target_width;
     int target_height;
     int target_fps;
+    bool is_moving = false;
     vector<DartboardCalibration> calibrations;
     vector<Mat> background_frames;
-
-    // Simple motion detection state (no complex state machine)
     vector<Mat> previous_frames;
-    chrono::steady_clock::time_point last_motion_time;
-    bool waiting_for_dart_detection = false;
+    vector<bool> are_moving = {false, false, false};            // Track motion state for each camera
+    vector<bool> was_moving_in_session = {false, false, false}; // Has moved during this session
 
-    vector<DetectorResult> detectDarts(const vector<Mat> &frames);
-    vector<DetectorResult> findDarts(const Mat &frame, const Mat &background, int camIndex);
-    Mat preprocessFrame(const Mat &frame, bool preserveColor = false);
-    string calculateScore(const Point &dartPosition, const DartboardCalibration &calib);
-    DetectorResult selectBestDetection(const vector<DetectorResult> &detections);
+    // Motion session timing
+    chrono::steady_clock::time_point motion_session_start_time;
+    chrono::steady_clock::time_point last_session_end_time;
+    const int MAX_MOTION_SESSION_MS = 2000; // Force end after 5 seconds
+    const int COOLDOWN_PERIOD_MS = 2300;    // Wait 500ms after session ends before allowing new session
+
+    vector<bool> detectMotion(const vector<Mat> &frames);
 
 // Debugging streamers for visual output
 #ifdef DEBUG_VIA_VIDEO_INPUT
