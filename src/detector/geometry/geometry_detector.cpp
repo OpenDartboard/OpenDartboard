@@ -13,66 +13,6 @@ GeometryDetector::GeometryDetector(bool debug_mode, int target_width, int target
     : initialized(false), calibrated(false), debug_mode(debug_mode), target_width(target_width), target_height(target_height), target_fps(target_fps)
 {
 }
-// Motion detection function - similar to camera::detectMotion but with state
-vector<bool> GeometryDetector::detectMotion(const vector<Mat> &frames)
-{
-
-    // Initialize previous frames on first run
-    if (previous_frames.empty())
-    {
-        // Direct assignment
-        previous_frames = frames;
-    }
-
-    // Detect current motion using camera utility
-    vector<bool> current_motions = {false, false, false};
-
-    // Motion detection for each camera (based on camera.hpp detectMotion)
-    for (size_t i = 0; i < frames.size() && i < previous_frames.size(); i++)
-    {
-        if (frames[i].empty())
-            continue;
-
-        // Convert to grayscale
-        Mat prev_gray, curr_gray;
-        cvtColor(previous_frames[i], prev_gray, COLOR_BGR2GRAY);
-        cvtColor(frames[i], curr_gray, COLOR_BGR2GRAY);
-
-        // Calculate absolute difference
-        Mat diff;
-        absdiff(prev_gray, curr_gray, diff);
-
-        // Apply threshold
-        Mat thresh;
-        threshold(diff, thresh, 25, 255, THRESH_BINARY);
-
-        // Apply morphological operations to reduce noise
-        Mat kernel = getStructuringElement(MORPH_RECT, Size(5, 5));
-        morphologyEx(thresh, thresh, MORPH_CLOSE, kernel);
-
-        // Debug: Save motion detection images
-        // if (debug_mode)
-        // {
-        //     system("mkdir -p debug_frames/geometry_detector/motion/");
-        //     imwrite("debug_frames/geometry_detector/motion/diff_cam_" + to_string(i) + ".jpg", diff);
-        //     imwrite("debug_frames/geometry_detector/motion/thresh_cam_" + to_string(i) + ".jpg", thresh);
-        //     imwrite("debug_frames/geometry_detector/motion/kernel_cam" + to_string(i) + ".jpg", kernel);
-        // }
-
-        // Count motion pixels and calculate ratio
-        int motion_pixels = countNonZero(thresh);
-        int total_pixels = thresh.rows * thresh.cols;
-        double motion_ratio = (double)motion_pixels / total_pixels;
-        double threshold_ratio = 0.05; // 5% of pixels changed
-
-        if (motion_ratio > threshold_ratio)
-        {
-            current_motions[i] = true;
-        }
-    }
-
-    return current_motions;
-}
 
 // Main process method - simplified to basic structure
 DetectorResult GeometryDetector::process(const vector<Mat> &frames)
@@ -87,96 +27,34 @@ DetectorResult GeometryDetector::process(const vector<Mat> &frames)
 
     DetectorResult result;
 
-    if (previous_frames.empty())
+    if (!calibrated || frames.empty())
     {
-        // Direct assignment
-        previous_frames = frames;
+        return result;
     }
 
-    // Check if we have any motions detected in any of the frames (cameras)
-    vector<bool> motions = GeometryDetector::detectMotion(frames);
-    auto now = chrono::steady_clock::now();
+    // Process motion session - all motion logic is now handled in motion_processing
+    motion_processing::MotionResult motion_result = motion_processing::processMotion(frames, false);
 
-    // Check if any camera detects motion this frame
-    bool any_motion_this_frame = count(motions.begin(), motions.end(), true) > 0;
+    // Set motion detection result
+    result.motion_detected = motion_result.session_active;
 
-    // Check if we're in cooldown period
-    auto cooldown_elapsed = chrono::duration_cast<chrono::milliseconds>(now - last_session_end_time).count();
-    bool in_cooldown = cooldown_elapsed < COOLDOWN_PERIOD_MS;
-
-    if (any_motion_this_frame && !is_moving && !in_cooldown)
+    if (motion_result.session_ended)
     {
-        // Start new motion session
-        is_moving = true;
-        motion_session_start_time = now;
-        fill(are_moving.begin(), are_moving.end(), false);
-        fill(was_moving_in_session.begin(), was_moving_in_session.end(), false);
-        log_debug("Motion session started");
-    }
-    else if (any_motion_this_frame && !is_moving && in_cooldown)
-    {
-        cout << "DEBUG: Motion detected but in cooldown period (" << cooldown_elapsed << "ms/" << COOLDOWN_PERIOD_MS << "ms)" << endl;
-    }
-
-    if (is_moving)
-    {
-        // Update camera states during active session
-        for (size_t i = 0; i < motions.size(); i++)
+        if (debug_mode)
         {
-            if (motions[i])
+            if (motion_result.end_reason == "success")
             {
-                are_moving[i] = true;
-                was_moving_in_session[i] = true;
+                log_info("Motion session completed successfully - ready for dart detection!");
             }
-            else
+            else if (motion_result.end_reason == "timeout")
             {
-                are_moving[i] = false;
+                log_warning("Motion session ended due to timeout");
             }
         }
 
-        // Check session end conditions IMMEDIATELY after updating states
-        auto session_duration = chrono::duration_cast<chrono::milliseconds>(now - motion_session_start_time).count();
-        int any_left_moving = count(are_moving.begin(), are_moving.end(), true);
-        int cameras_that_moved = count(was_moving_in_session.begin(), was_moving_in_session.end(), true);
-        int total_cameras = motions.size();
-
-        // DEBUG: Show which specific cameras are moving and which participated
-        cout << "DEBUG: duration=" << session_duration << "ms";
-        cout << " | Currently moving: ";
-        for (size_t i = 0; i < are_moving.size(); i++)
-        {
-            if (are_moving[i])
-                cout << "cam" << i << " ";
-        }
-        cout << " | Participated: ";
-        for (size_t i = 0; i < was_moving_in_session.size(); i++)
-        {
-            if (was_moving_in_session[i])
-                cout << "cam" << i << " ";
-        }
-        cout << " | Total: " << cameras_that_moved << "/" << total_cameras;
-
-        // Check success condition FIRST (before timeout)
-        if (any_left_moving == 0 && cameras_that_moved == total_cameras)
-        {
-            cout << " -> ENDING SESSION (success)" << endl;
-            log_debug("Motion session ended (all cameras participated and stopped) - duration: " + to_string(session_duration) + "ms, cameras participated: " + to_string(cameras_that_moved) + "/" + to_string(total_cameras));
-            is_moving = false;
-            last_session_end_time = now; // Start cooldown period
-            // TODO: This is where you'd capture frames and do dart detection
-        }
-        else if (session_duration >= MAX_MOTION_SESSION_MS)
-        {
-            cout << " -> ENDING SESSION (timeout)" << endl;
-            log_debug("Motion session ended (maximum timeout reached) - duration: " + to_string(session_duration) + "ms, cameras participated: " + to_string(cameras_that_moved) + "/" + to_string(total_cameras));
-            is_moving = false;
-            last_session_end_time = now; // Start cooldown period
-            // TODO: This is where you'd capture frames and do dart detection
-        }
-        else
-        {
-            // cout << " -> continuing..." << endl;
-        }
+        // TODO: This is where you'd capture frames and do dart detection
+        // Current frames should be stable and contain the dart
+        log_info("Processing dart detection...");
     }
 
     return result;

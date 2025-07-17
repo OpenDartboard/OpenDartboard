@@ -4,6 +4,7 @@
 #include <vector>
 #include "../detector_interface.hpp"
 #include "calibration/geometry_calibration.hpp"
+#include "detection/motion_processing.hpp"
 #include "streamer.hpp"
 
 using namespace cv;
@@ -28,22 +29,10 @@ protected:
     int target_width;
     int target_height;
     int target_fps;
-    bool is_moving = false;
     vector<DartboardCalibration> calibrations;
     vector<Mat> background_frames;
-    vector<Mat> previous_frames;
-    vector<bool> are_moving = {false, false, false};            // Track motion state for each camera
-    vector<bool> was_moving_in_session = {false, false, false}; // Has moved during this session
 
-    // Motion session timing
-    chrono::steady_clock::time_point motion_session_start_time;
-    chrono::steady_clock::time_point last_session_end_time;
-    const int MAX_MOTION_SESSION_MS = 2000; // Force end after 2 seconds
-    const int COOLDOWN_PERIOD_MS = 2300;    // Wait 2.3s after session ends before allowing new session
-
-    vector<bool> detectMotion(const vector<Mat> &frames);
-
-// Debugging streamers for visual output
+    // Debugging streamers for visual output
 #ifdef DEBUG_VIA_VIDEO_INPUT
     unique_ptr<streamer> raw_streamer; // Port 8080 - Raw camera feeds
 #endif
