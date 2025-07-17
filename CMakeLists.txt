@@ -47,6 +47,9 @@ add_executable(opendartboard
     src/detector/geometry/calibration/wire_processing.cpp
     src/detector/geometry/calibration/perspective_processing.cpp
     src/detector/geometry/calibration/orientation_processing.cpp
+    # detection files
+    # src/detector/geometry/detection/geometry_detection.cpp
+    src/detector/geometry/detection/motion_processing.cpp
 )
 
 # Add include directories for easier includes
