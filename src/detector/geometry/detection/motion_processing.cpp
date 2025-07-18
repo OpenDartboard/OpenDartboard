@@ -227,9 +227,9 @@ namespace motion_processing
                 stable_frame_count++;
                 if (stable_frame_count >= params.stability_frames)
                 {
-                    // Dart landing confirmed!
-                    current_state = DartEventState::DART_DETECTED;
-                    result.dart_detected = true;
+                    // Motion event finished!
+                    current_state = DartEventState::END;
+                    result.motion_finished = true;
                     int cameras_that_spiked = count(cameras_spiked.begin(), cameras_spiked.end(), true);
                 }
             }
@@ -250,12 +250,12 @@ namespace motion_processing
             }
         }
 
-        case DartEventState::DART_DETECTED:
+        case DartEventState::END:
         {
             // Transition to cooldown immediately
             current_state = DartEventState::COOLDOWN;
             cooldown_start_time = now;
-            result.dart_detected = true;
+            result.motion_finished = true;
 
             break;
         }

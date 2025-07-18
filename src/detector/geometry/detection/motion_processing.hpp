@@ -30,13 +30,13 @@ namespace motion_processing
         int blur_sigma_y = 10;         // Sigma for Gaussian blur in Y direction
 
         // Event-based dart detection params
-        double spike_threshold = 0.05;     // High motion intensity that indicates potential dart hit
-        double low_threshold = 0.03;       // Low motion intensity for stability detection
+        double spike_threshold = 0.08;     // High motion intensity that indicates potential dart hit
+        double low_threshold = 0.001;      // Low motion intensity for stability detection
         int min_cameras_for_event = 2;     // Minimum cameras that must participate in dart event
-        int spike_window_frames = 5;       // Frames to wait for other cameras to join spike
-        int stability_frames = 6;          // Consecutive low-motion frames needed for stability
+        int spike_window_frames = 10;      // Frames to wait for other cameras to join spike
+        int stability_frames = 10;         // Consecutive low-motion frames needed for stability
         int max_event_duration_ms = 10000; // Maximum time for dart event (safety timeout)
-        int cooldown_period_ms = 2000;     // Cooldown after dart detection
+        int cooldown_period_ms = 1000;     // Cooldown after dart detection
     };
 
     // Event states for dart detection
@@ -45,14 +45,14 @@ namespace motion_processing
         IDLE,           // No motion detected
         SPIKE_DETECTED, // High motion detected, waiting for pattern confirmation
         STABILIZING,    // Waiting for motion to settle down
-        DART_DETECTED,  // Dart landing confirmed
+        END,            // Motion event finished,
         COOLDOWN        // Preventing immediate re-detection
     };
 
     // Session result information
     struct MotionResult
     {
-        bool dart_detected = false;                          // Was a dart landing detected this frame
+        bool motion_finished = false;                        // Did a motion event just finish
         DartEventState current_state = DartEventState::IDLE; // Current detection state
         int detection_duration_ms = 0;                       // How long current detection has been running
     };
