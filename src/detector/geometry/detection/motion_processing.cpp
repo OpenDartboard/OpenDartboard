@@ -1,5 +1,6 @@
 #include "motion_processing.hpp"
 #include "utils.hpp"
+#include "utils/streamer.hpp"
 
 using namespace cv;
 using namespace std;
@@ -10,14 +11,18 @@ namespace motion_processing
     static vector<Mat> previous_frames;
     static bool initialized = false;
 
-    // Session management state
-    static bool is_moving = false;
-    static vector<bool> are_moving;
-    static vector<bool> was_moving_in_session;
-    static chrono::steady_clock::time_point motion_session_start_time;
-    static chrono::steady_clock::time_point last_session_end_time;
+    static unique_ptr<streamer> motion_streamer;
+    static unique_ptr<streamer> motion2_streamer;
 
-    vector<bool> detectMotion(const vector<Mat> &current_frames, bool debug_mode, const MotionParams &params)
+    // Event-based dart detection state
+    static DartEventState current_state = DartEventState::IDLE;
+    static chrono::steady_clock::time_point event_start_time;
+    static chrono::steady_clock::time_point cooldown_start_time;
+    static vector<bool> cameras_spiked;
+    static vector<double> intensity_history;
+    static int stable_frame_count = 0;
+
+    vector<MotionData> detectMotion(const vector<Mat> &current_frames, const vector<Mat> &background_frames, bool debug_mode, const MotionParams &params)
     {
         // Initialize previous frames on first run
         if (!initialized || previous_frames.size() != current_frames.size())
@@ -28,7 +33,7 @@ namespace motion_processing
             if (current_frames.size() != 3)
             {
                 log_warning("Motion processing initialized with " + to_string(current_frames.size()) + " cameras, but expected 3 cameras. Skipping initialization.");
-                return vector<bool>(current_frames.size(), false);
+                return vector<MotionData>(current_frames.size());
             }
 
             for (const auto &frame : current_frames)
@@ -39,23 +44,35 @@ namespace motion_processing
             initialized = true;
             log_debug("Motion processing initialized with " + to_string(current_frames.size()) + " cameras");
 
+            if (debug_mode)
+            {
+                motion_streamer = make_unique<streamer>(8081, 30);
+                motion2_streamer = make_unique<streamer>(8082, 30);
+            }
+
             // Return no motion on first frame
-            return vector<bool>(current_frames.size(), false);
+            return vector<MotionData>(current_frames.size());
         }
 
-        // Detect current motion using our processing
-        vector<bool> current_motions(current_frames.size(), false);
+        // Detect current motion using our processing - now with actual data
+        vector<MotionData> motion_data(current_frames.size());
+        vector<Mat> motion_viz_frames;
+        vector<Mat> motion_viz_frames2;
 
         // Motion detection for each camera
         for (size_t i = 0; i < current_frames.size() && i < previous_frames.size(); i++)
         {
-            if (current_frames[i].empty() || previous_frames[i].empty())
+            if (current_frames[i].empty() || previous_frames[i].empty() || background_frames[i].empty())
                 continue;
 
             // Convert to grayscale
             Mat prev_gray, curr_gray;
             cvtColor(previous_frames[i], prev_gray, COLOR_BGR2GRAY);
             cvtColor(current_frames[i], curr_gray, COLOR_BGR2GRAY);
+
+            // clean up frames so there no noise
+            GaussianBlur(prev_gray, prev_gray, Size(params.blur_kernel_size, params.blur_kernel_size), params.blur_sigma_x, params.blur_sigma_y, BORDER_DEFAULT);
+            GaussianBlur(curr_gray, curr_gray, Size(params.blur_kernel_size, params.blur_kernel_size), params.blur_sigma_x, params.blur_sigma_y, BORDER_DEFAULT);
 
             // Calculate absolute difference
             Mat diff;
@@ -75,17 +92,24 @@ namespace motion_processing
                 system("mkdir -p debug_frames/motion_processing");
                 imwrite("debug_frames/motion_processing/diff_cam_" + to_string(i) + ".jpg", diff);
                 imwrite("debug_frames/motion_processing/thresh_cam_" + to_string(i) + ".jpg", thresh);
+
+                // this just an example of how to visualize motion
+                // this should do MORE;
+
+                motion_viz_frames.push_back(diff);
+                motion_viz_frames2.push_back(thresh);
             }
 
-            // Count motion pixels and calculate ratio
+            // Count motion pixels and calculate ratio - CAPTURE THE REAL DATA!
             int motion_pixels = countNonZero(thresh);
             int total_pixels = thresh.rows * thresh.cols;
             double motion_ratio = (double)motion_pixels / total_pixels;
 
-            if (motion_ratio > params.threshold_ratio)
-            {
-                current_motions[i] = true;
-            }
+            // Store all the motion data
+            motion_data[i].motion_pixels = motion_pixels;
+            motion_data[i].total_pixels = total_pixels;
+            motion_data[i].motion_ratio = motion_ratio;
+            motion_data[i].motion_detected = (motion_ratio > params.threshold_ratio);
         }
 
         // Update previous frames for next iteration
@@ -94,133 +118,164 @@ namespace motion_processing
             previous_frames[i] = current_frames[i].clone();
         }
 
-        return current_motions;
+        if (debug_mode)
+        {
+            Mat combined_motion = debug::createCombinedFrame(motion_viz_frames, "diff");
+            motion_streamer->push(combined_motion);
+            Mat combined_motion2 = debug::createCombinedFrame(motion_viz_frames2, "thresh");
+            motion2_streamer->push(combined_motion2);
+        }
+
+        return motion_data;
     }
 
-    MotionResult processMotion(const vector<Mat> &current_frames, bool debug_mode, const MotionParams &params)
+    MotionResult processMotion(const vector<Mat> &current_frames, const vector<Mat> &background_frames, bool debug_mode, const MotionParams &params)
     {
         MotionResult result;
 
-        // Initialize session state vectors if needed
-        if (are_moving.size() != current_frames.size())
-        {
-            are_moving.resize(current_frames.size(), false);
-            was_moving_in_session.resize(current_frames.size(), false);
-        }
-
-        // Get motion detection results
-        vector<bool> motions = detectMotion(current_frames, debug_mode, params);
+        // Get motion data from all cameras
+        vector<MotionData> motion_data = detectMotion(current_frames, background_frames, debug_mode, params);
         auto now = chrono::steady_clock::now();
 
-        // Check if any camera detects motion this frame
-        bool any_motion_this_frame = count(motions.begin(), motions.end(), true) > 0;
+        // Calculate overall motion intensity (average across all cameras)
+        double total_intensity = 0.0;
+        int cameras_with_motion = 0;
 
-        // Check if we're in cooldown period
-        auto cooldown_elapsed = chrono::duration_cast<chrono::milliseconds>(now - last_session_end_time).count();
-        bool in_cooldown = cooldown_elapsed < params.cooldown_period_ms;
-
-        if (any_motion_this_frame && !is_moving && !in_cooldown)
+        for (const auto &data : motion_data)
         {
-            // Start new motion session
-            is_moving = true;
-            motion_session_start_time = now;
-            fill(are_moving.begin(), are_moving.end(), false);
-            fill(was_moving_in_session.begin(), was_moving_in_session.end(), false);
-            log_debug("Motion session started");
-        }
-        else if (any_motion_this_frame && !is_moving && in_cooldown)
-        {
-            if (debug_mode)
-            {
-                cout << "DEBUG: Motion detected but in cooldown period (" << cooldown_elapsed << "ms/" << params.cooldown_period_ms << "ms)" << endl;
-            }
+            total_intensity += data.motion_ratio;
+            if (data.motion_detected)
+                cameras_with_motion++;
         }
 
-        if (is_moving)
+        double current_intensity = total_intensity / motion_data.size();
+
+        // Initialize cameras_spiked vector if needed
+        if (cameras_spiked.size() != motion_data.size())
         {
-            // Update camera states during active session
-            for (size_t i = 0; i < motions.size(); i++)
+            cameras_spiked.resize(motion_data.size(), false);
+        }
+
+        // Calculate detection duration if we're in an active state
+        if (current_state != DartEventState::IDLE && current_state != DartEventState::COOLDOWN)
+        {
+            result.detection_duration_ms = chrono::duration_cast<chrono::milliseconds>(now - event_start_time).count();
+        }
+
+        // State machine for dart event detection
+        switch (current_state)
+        {
+        case DartEventState::IDLE:
+        {
+            // Look for motion spike that could indicate dart hit
+            if (current_intensity > params.spike_threshold)
             {
-                if (motions[i])
+                current_state = DartEventState::SPIKE_DETECTED;
+                event_start_time = now;
+                fill(cameras_spiked.begin(), cameras_spiked.end(), false);
+                intensity_history.clear();
+                stable_frame_count = 0;
+
+                // Mark cameras that are spiking
+                for (size_t i = 0; i < motion_data.size(); i++)
                 {
-                    are_moving[i] = true;
-                    was_moving_in_session[i] = true;
+                    if (motion_data[i].motion_ratio > params.spike_threshold)
+                    {
+                        cameras_spiked[i] = true;
+                    }
                 }
-                else
+            }
+            break;
+        }
+
+        case DartEventState::SPIKE_DETECTED:
+        {
+            // Continue tracking which cameras spike during the event window
+            for (size_t i = 0; i < motion_data.size(); i++)
+            {
+                if (motion_data[i].motion_ratio > params.spike_threshold)
                 {
-                    are_moving[i] = false;
+                    cameras_spiked[i] = true;
                 }
             }
 
-            // Check session end conditions
-            auto session_duration = chrono::duration_cast<chrono::milliseconds>(now - motion_session_start_time).count();
-            int any_left_moving = count(are_moving.begin(), are_moving.end(), true);
-            int cameras_that_moved = count(was_moving_in_session.begin(), was_moving_in_session.end(), true);
-            int total_cameras = motions.size();
+            int cameras_that_spiked = count(cameras_spiked.begin(), cameras_spiked.end(), true);
+            auto event_duration = chrono::duration_cast<chrono::milliseconds>(now - event_start_time).count();
 
-            // Debug output
-            if (debug_mode)
+            // Check if we have enough camera participation and motion is settling
+            if (cameras_that_spiked >= params.min_cameras_for_event &&
+                current_intensity <= params.low_threshold)
             {
-                cout << "DEBUG: duration=" << session_duration << "ms";
-                cout << " | Currently moving: ";
-                for (size_t i = 0; i < are_moving.size(); i++)
-                {
-                    if (are_moving[i])
-                        cout << "cam" << i << " ";
-                }
-                cout << " | Participated: ";
-                for (size_t i = 0; i < was_moving_in_session.size(); i++)
-                {
-                    if (was_moving_in_session[i])
-                        cout << "cam" << i << " ";
-                }
-                cout << " | Total: " << cameras_that_moved << "/" << total_cameras;
+                current_state = DartEventState::STABILIZING;
+                stable_frame_count = 1;
             }
-
-            // Check success condition FIRST (before timeout)
-            if (any_left_moving == 0 && cameras_that_moved == total_cameras)
+            // Timeout if event takes too long or insufficient participation
+            else if (event_duration > params.max_event_duration_ms ||
+                     (event_duration > params.spike_window_frames * 50 && cameras_that_spiked < params.min_cameras_for_event))
             {
-                if (debug_mode)
-                    cout << " -> ENDING SESSION (success)" << endl;
-                log_debug("Motion session ended (all cameras participated and stopped) - duration: " + to_string(session_duration) + "ms");
-
-                result.session_ended = true;
-                result.end_reason = "success";
-                result.session_duration_ms = session_duration;
-                result.cameras_participated = cameras_that_moved;
-                result.total_cameras = total_cameras;
-
-                is_moving = false;
-                last_session_end_time = now;
+                current_state = DartEventState::IDLE;
+                log_warning("DART EVENT: Event timeout or insufficient cameras (" + to_string(cameras_that_spiked) + "/" + to_string(params.min_cameras_for_event) + ") after " + to_string(event_duration) + "ms");
             }
-            else if (session_duration >= params.max_session_duration_ms)
+            break;
+        }
+
+        case DartEventState::STABILIZING:
+        {
+            // Track motion intensity to confirm stability
+            if (current_intensity <= params.low_threshold)
             {
-                if (debug_mode)
-                    cout << " -> ENDING SESSION (timeout)" << endl;
-                log_debug("Motion session ended (timeout) - duration: " + to_string(session_duration) + "ms");
-
-                result.session_ended = true;
-                result.end_reason = "timeout";
-                result.session_duration_ms = session_duration;
-                result.cameras_participated = cameras_that_moved;
-                result.total_cameras = total_cameras;
-
-                is_moving = false;
-                last_session_end_time = now;
+                stable_frame_count++;
+                if (stable_frame_count >= params.stability_frames)
+                {
+                    // Dart landing confirmed!
+                    current_state = DartEventState::DART_DETECTED;
+                    result.dart_detected = true;
+                    int cameras_that_spiked = count(cameras_spiked.begin(), cameras_spiked.end(), true);
+                }
             }
             else
             {
-                if (debug_mode)
-                    cout << " -> continuing..." << endl;
+                // Motion increased - could be dart removal or false positive
+                if (current_intensity > params.spike_threshold)
+                {
+                    // Big spike during stabilization - probably dart removal, reset
+                    current_state = DartEventState::IDLE;
+                }
+                else
+                {
+                    // Small increase, reset stability counter but keep trying
+                    stable_frame_count = 0;
+                }
+                break;
             }
-
-            // Set current session state
-            result.session_active = is_moving;
-            result.currently_moving = are_moving;
-            result.participated_cameras = was_moving_in_session;
         }
 
-        result.session_active = is_moving;
+        case DartEventState::DART_DETECTED:
+        {
+            // Transition to cooldown immediately
+            current_state = DartEventState::COOLDOWN;
+            cooldown_start_time = now;
+            result.dart_detected = true;
+
+            break;
+        }
+
+        case DartEventState::COOLDOWN:
+        {
+            auto cooldown_elapsed = chrono::duration_cast<chrono::milliseconds>(now - cooldown_start_time).count();
+            if (cooldown_elapsed >= params.cooldown_period_ms)
+            {
+                current_state = DartEventState::IDLE;
+            }
+            else if (debug_mode && current_intensity > params.spike_threshold)
+            {
+                log_debug("COOLDOWN: Motion during cooldown period - intensity: " + to_string(current_intensity) + ", remaining: " + to_string(params.cooldown_period_ms - cooldown_elapsed) + "ms");
+            }
+            break;
+        }
+        }
+
+        result.current_state = current_state;
         return result;
     }
 
