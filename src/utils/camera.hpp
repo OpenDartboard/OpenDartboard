@@ -110,7 +110,7 @@ namespace camera
         }
 
 #ifdef DEBUG_VIA_VIDEO_INPUT
-        std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(1000.0 / 30)));
+        std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(1000.0 / 60)));
 #endif
 
         return frames;

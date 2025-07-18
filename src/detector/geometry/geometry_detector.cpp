@@ -33,28 +33,16 @@ DetectorResult GeometryDetector::process(const vector<Mat> &frames)
     }
 
     // Process motion session - all motion logic is now handled in motion_processing
-    motion_processing::MotionResult motion_result = motion_processing::processMotion(frames, false);
+    motion_processing::MotionResult motion_result = motion_processing::processMotion(frames, background_frames, debug_mode);
 
     // Set motion detection result
-    result.motion_detected = motion_result.session_active;
+    result.motion_detected = motion_result.dart_detected;
 
-    if (motion_result.session_ended)
+    // Log dart detection events
+    if (motion_result.dart_detected)
     {
-        if (debug_mode)
-        {
-            if (motion_result.end_reason == "success")
-            {
-                log_info("Motion session completed successfully - ready for dart detection!");
-            }
-            else if (motion_result.end_reason == "timeout")
-            {
-                log_warning("Motion session ended due to timeout");
-            }
-        }
-
-        // TODO: This is where you'd capture frames and do dart detection
-        // Current frames should be stable and contain the dart
-        log_info("Processing dart detection...");
+        log_info("DART DETECTED! Ready for dart localization and scoring.");
+        // TODO: This is where you'd do dart localization using current frames
     }
 
     return result;
