@@ -14,82 +14,82 @@ using namespace cv;
 Scorer::Scorer(const string &model, int w, int h, int fps, const vector<string> &cams, bool debug_mode, const string &detector_type)
     : model_path(model), width(w), height(h), fps(fps), camera_sources(cams), debug_display(debug_mode), detector_type_name(detector_type)
 {
-  // Initialize cameras
-  if (!camera::initializeCameras(cameras, camera_sources, width, height, fps))
-  {
-    log_error("Failed to initialize cameras");
-    return;
-  }
+    // Initialize cameras
+    if (!camera::initializeCameras(cameras, camera_sources, width, height, fps))
+    {
+        log_error("Failed to initialize cameras");
+        return;
+    }
 
-  // Create detector
-  detector = DetectorFactory::createDetector(detector_type_name, debug_display, width, height, fps);
+    // Create detector
+    detector = DetectorFactory::createDetector(detector_type_name, debug_display, width, height, fps);
 
-  // Initialize detector
-  if (!detector->initialize(cameras))
-  {
-    log_error("Failed to initialize detector.");
-  }
-  else
-  {
-    log_info("Detector initialized successfully");
-  }
+    // Initialize detector
+    if (!detector->initialize(cameras))
+    {
+        log_error("Failed to initialize detector.");
+    }
+    else
+    {
+        log_info("Detector initialized successfully");
+    }
 }
 
 Scorer::~Scorer()
 {
-  stop();
+    stop();
 }
 
 void Scorer::stop()
 {
-  running = false;
+    running = false;
 }
 
 void Scorer::sendResult(const DetectorResult &result)
 {
-  // For now, just log it - later this becomes WebSocket/API
-  if (result.dart_detected)
-  {
-    log_info("SCORE: " + result.score +
-             " | Position: (" + to_string((int)result.position.x) + "," + to_string((int)result.position.y) + ")" +
-             " | Confidence: " + to_string(result.confidence) +
-             " | Camera: " + to_string(result.camera_index) +
-             " | Processing: " + to_string(result.processing_time_ms) + "ms");
-  }
+    // For now, just log it - later this becomes WebSocket/API
+    if (result.dart_detected)
+    {
+        log_info("SCORE: " + result.score +
+                 " | Position: (" + to_string((int)result.position.x) + "," + to_string((int)result.position.y) + ")" +
+                 " | Confidence: " + to_string(result.confidence) +
+                 " | Camera: " + to_string(result.camera_index) +
+                 " | Processing: " + to_string(result.processing_time_ms) + "ms");
+    }
 
-  if (debug_display && result.motion_detected)
-  {
-    log_debug("Motion detected on frame");
-  }
+    if (debug_display && result.motion_detected)
+    {
+        log_debug("Motion detected on frame");
+    }
 }
 
 void Scorer::run()
 {
-  if (!detector->isInitialized())
-  {
-    log_error("Detector not initialized - cannot run");
-    return;
-  }
-
-  running = true;
-  log_info("Scorer running with " + to_string(camera_sources.size()) + " cameras");
-  log_info("Using detector: " + detector_type_name);
-
-  while (running)
-  {
-    // 1. Capture frames
-    vector<cv::Mat> frames = camera::captureFrames(cameras);
-    if (!frames.empty())
+    if (!detector->isInitialized())
     {
-      // 2. Process frames by the detector
-      DetectorResult result = detector->process(frames);
-      // 3. Send result if something detected
-      if (result)
-      {
-        sendResult(result);
-      }
+        log_error("Detector not initialized - cannot run");
+        return;
     }
-  }
 
-  log_info("Scorer stopped");
+    running = true;
+    log_info("Scorer running with " + to_string(camera_sources.size()) + " cameras");
+    log_info("Using detector: " + detector_type_name);
+
+    while (running)
+    {
+        // 1. Capture frames
+        vector<cv::Mat> frames = camera::captureFrames(cameras);
+        if (!frames.empty())
+        {
+            // 2. Process frames by the detector
+            DetectorResult result = detector->process(frames);
+            // 3. Send result if something detected
+            if (result)
+            {
+                sendResult(result);
+            }
+        }
+    }
+
+    log_info("Scorer stopped");
 }

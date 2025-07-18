@@ -3,6 +3,7 @@
 
 #include "geometry_detector.hpp"
 #include "calibration/geometry_calibration.hpp"
+#include "detection/dart_processing.hpp"
 #include "utils.hpp"
 
 using namespace cv;
@@ -25,6 +26,9 @@ DetectorResult GeometryDetector::process(const vector<Mat> &frames)
     }
 #endif
 
+    // Start a timer to measure processing time
+    auto start_time = chrono::steady_clock::now();
+
     DetectorResult result;
 
     if (!calibrated || frames.empty())
@@ -35,16 +39,41 @@ DetectorResult GeometryDetector::process(const vector<Mat> &frames)
     // Process motion session - all motion logic is now handled in motion_processing
     motion_processing::MotionResult motion_result = motion_processing::processMotion(frames, background_frames, debug_mode);
 
-    // Set motion detection result
-    result.motion_detected = motion_result.dart_detected;
+    // Process dart state detection
+    dart_processing::DartStateResult dart_result = dart_processing::processDartState(frames, background_frames, motion_result.motion_finished, debug_mode);
 
-    // Log dart detection events
-    if (motion_result.dart_detected)
+    // Lets now just mock the result, use previous_state, and current_state
+    // lets first compare if previous state is different from current state
+    if (dart_result.previous_state != dart_result.current_state)
     {
-        log_info("DART DETECTED! Ready for dart localization and scoring.");
-        // TODO: This is where you'd do dart localization using current frames
+        result.dart_detected = true;
+        // we should now check what it was
+        switch (dart_result.current_state)
+        {
+        case dart_processing::DartBoardState::CLEAN:
+            result.score = "END";
+            result.position = Point2f(-1, -1); // No dart position
+            result.confidence = 0.9f;          // Mock confidence
+            result.camera_index = 0;           // Assume first camera for now
+            break;
+        case dart_processing::DartBoardState::DART_1:
+        case dart_processing::DartBoardState::DART_2:
+        case dart_processing::DartBoardState::DART_3:
+            // random value of score for now from 1 to 20, need to include S, D, T prefix too!!
+            result.score = to_string(rand() % 20 + 1); // Mock score from 1 to 20
+            result.score = "D" + result.score;         // Mock score from 1 to 20
+            result.position = Point2f(100, 100);
+            result.confidence = 0.9f; // Mock confidence
+            result.camera_index = 0;  // Assume first camera for now
+            break;
+        }
     }
 
+    // before we return, we to print the processing time
+    auto end_time = chrono::steady_clock::now();
+    auto processing_time = chrono::duration_cast<chrono::milliseconds>(end_time - start_time).count();
+    result.processing_time_ms = static_cast<int>(processing_time);
+    // log_debug("Processing time: " + to_string(result.processing_time_ms) + " ms");
     return result;
 }
 
