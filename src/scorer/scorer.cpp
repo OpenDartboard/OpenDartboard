@@ -89,6 +89,10 @@ void Scorer::run()
 
     while (running)
     {
+
+        // start a clock to measure FPS
+        auto start_time = chrono::steady_clock::now();
+
         // 1. Capture frames
         vector<cv::Mat> frames = camera::captureFrames(cameras);
         if (!frames.empty())
@@ -98,6 +102,10 @@ void Scorer::run()
             // 3. Send result if something detected
             if (result)
             {
+                // before seending it; lets add the time it took to process
+                auto end_time = chrono::steady_clock::now();
+                auto processing_time = chrono::duration_cast<chrono::milliseconds>(end_time - start_time).count();
+                result.processing_time_ms = static_cast<int>(processing_time);
                 sendResult(result);
             }
         }

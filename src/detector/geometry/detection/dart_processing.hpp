@@ -31,17 +31,19 @@ namespace dart_processing
         int morph_kernel_size = 4; // Size of morphological kernel
 
         // Statbility frames
-        int stability_frames = 5; // Frames needed to confirm state change
+        int stability_frames = 6; // Frames needed to confirm state change / (3 cameras * 2 frames per camera)
     };
 
     // Per-camera detection result
     struct CameraDetectionResult
     {
-        DartBoardState previous_state = DartBoardState::CLEAN; // Previous state for comparison
         DartBoardState detected_state = DartBoardState::CLEAN;
-        int total_contours = 0;
-        double change_ratio = 0.0;
-        int total_pixels = 0; // Total pixels in frame
+        int total_changed_pixels = 0;              // Total changed pixels
+        double change_ratio = 0.0;                 // Percentage of changed pixels
+        int total_pixels = 0;                      // Total pixels in frame
+        Point2f tip_position = Point2f(-1, -1);    // Position of dart tip if found
+        Point2f center_position = Point2f(-1, -1); // Center of biggest dart shape
+        bool tip_found = false;                    // Was tip found in this frame
     };
 
     // Result of dart state detection

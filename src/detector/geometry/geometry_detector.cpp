@@ -26,9 +26,6 @@ DetectorResult GeometryDetector::process(const vector<Mat> &frames)
     }
 #endif
 
-    // Start a timer to measure processing time
-    auto start_time = chrono::steady_clock::now();
-
     DetectorResult result;
 
     if (!calibrated || frames.empty())
@@ -69,10 +66,6 @@ DetectorResult GeometryDetector::process(const vector<Mat> &frames)
         }
     }
 
-    // before we return, we to print the processing time
-    auto end_time = chrono::steady_clock::now();
-    auto processing_time = chrono::duration_cast<chrono::milliseconds>(end_time - start_time).count();
-    result.processing_time_ms = static_cast<int>(processing_time);
     // log_debug("Processing time: " + to_string(result.processing_time_ms) + " ms");
     return result;
 }

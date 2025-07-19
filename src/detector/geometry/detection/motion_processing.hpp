@@ -34,7 +34,7 @@ namespace motion_processing
         double low_threshold = 0.001;      // Low motion intensity for stability detection
         int min_cameras_for_event = 2;     // Minimum cameras that must participate in dart event
         int spike_window_frames = 10;      // Frames to wait for other cameras to join spike
-        int stability_frames = 10;         // Consecutive low-motion frames needed for stability
+        int stability_frames = 15;         // Consecutive low-motion frames needed for stability
         int max_event_duration_ms = 10000; // Maximum time for dart event (safety timeout)
         int cooldown_period_ms = 1000;     // Cooldown after dart detection
     };
