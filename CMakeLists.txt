@@ -1,6 +1,26 @@
 cmake_minimum_required(VERSION 3.17)
 project(opendartboard LANGUAGES CXX)
 
+# Add FetchContent module for dependency management
+include(FetchContent)
+
+# Fetch nlohmann/json
+FetchContent_Declare(
+    nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG v3.12.0
+)
+
+# Fetch cpp-httplib (MIT licensed)
+FetchContent_Declare(
+    httplib
+    GIT_REPOSITORY https://github.com/yhirose/cpp-httplib.git
+    GIT_TAG v0.14.3
+)
+
+# Make dependencies available
+FetchContent_MakeAvailable(nlohmann_json httplib)
+
 # Tell CMake where the static ncnn & OpenCV we just built/installed live.
 set(CMAKE_PREFIX_PATH "/usr/local" ${CMAKE_PREFIX_PATH})
 
@@ -34,6 +54,9 @@ pkg_check_modules(TESSERACT REQUIRED tesseract)
 add_executable(opendartboard
     src/main.cpp
     src/scorer/scorer.cpp
+    # Communication components
+    src/communication/score_queue.cpp
+    src/communication/websocket_service.cpp
     # src/detector/ai/yolo_detector.cpp // Uncomment when AI detector is ready
     src/detector/geometry/geometry_detector.cpp
     # calibration files
@@ -66,6 +89,7 @@ target_include_directories(opendartboard PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/src/utils
     /usr/include/opencv4  # Add explicit path to OpenCV headers
+    ${httplib_SOURCE_DIR}  # Add httplib include path (not libwebsockets)
 )
 
 target_link_libraries(opendartboard
@@ -77,6 +101,7 @@ target_link_libraries(opendartboard
         ${GSTREAMER_BASE_LIBRARIES}
         ${GSTREAMER_VIDEO_LIBRARIES}
         ${TESSERACT_LIBRARIES}
+        nlohmann_json::nlohmann_json
         ${CMAKE_DL_LIBS}
         Threads::Threads  # Add pthread linking
 )

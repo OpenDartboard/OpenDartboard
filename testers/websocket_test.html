@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Dartboard Score Monitor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #111;
+            color: #fff;
+            margin: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .connected { background: #2d5a2d; }
+        .disconnected { background: #5a2d2d; }
+        .score-display {
+            font-size: 2em;
+            text-align: center;
+            padding: 20px;
+            background: #333;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .score-history {
+            background: #222;
+            padding: 15px;
+            border-radius: 5px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .score-item {
+            padding: 8px;
+            margin: 5px 0;
+            background: #444;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .connect-btn { background: #4CAF50; color: white; }
+        .disconnect-btn { background: #f44336; color: white; }
+        .clear-btn { background: #ff9800; color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Dartboard Score Monitor</h1>
+        
+        <div id="status" class="status disconnected">
+            ❌ Disconnected from ws://localhost:13520/scores
+        </div>
+        
+        <div>
+            <button id="connectBtn" class="connect-btn">Connect</button>
+            <button id="disconnectBtn" class="disconnect-btn">Disconnect</button>
+            <button id="clearBtn" class="clear-btn">Clear History</button>
+        </div>
+        
+        <div class="score-display">
+            <div id="lastScore">Waiting for scores...</div>
+            <small id="lastTime"></small>
+        </div>
+        
+        <div class="score-history">
+            <h3>Score History:</h3>
+            <div id="scoreHistory"></div>
+        </div>
+    </div>
+
+    <script>
+        let socket = null;
+        let scoreCount = 0;
+        
+        const statusDiv = document.getElementById('status');
+        const lastScoreDiv = document.getElementById('lastScore');
+        const lastTimeDiv = document.getElementById('lastTime');
+        const historyDiv = document.getElementById('scoreHistory');
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        
+        function updateStatus(connected, message) {
+            statusDiv.className = `status ${connected ? 'connected' : 'disconnected'}`;
+            statusDiv.innerHTML = `${connected ? '✅' : '❌'} ${message}`;
+        }
+        
+        function addScoreToHistory(scoreData) {
+            scoreCount++;
+            const item = document.createElement('div');
+            item.className = 'score-item';
+            
+            const time = new Date(scoreData.timestamp).toLocaleTimeString();
+            item.innerHTML = `
+                <strong>#${scoreCount} - ${scoreData.score}</strong> 
+                at (${scoreData.position.x}, ${scoreData.position.y})
+                <br>
+                <small>
+                    Confidence: ${(scoreData.confidence * 100).toFixed(1)}% | 
+                    Camera: ${scoreData.camera} | 
+                    Processing: ${scoreData.processing_time}ms | 
+                    Time: ${time}
+                </small>
+            `;
+            
+            historyDiv.insertBefore(item, historyDiv.firstChild);
+            
+            // Keep only last 50 scores
+            while (historyDiv.children.length > 50) {
+                historyDiv.removeChild(historyDiv.lastChild);
+            }
+        }
+        
+        function connect() {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                return;
+            }
+            
+            updateStatus(false, 'Connecting to ws://localhost:13520/scores...');
+            
+            socket = new WebSocket('ws://localhost:13520/scores');
+            
+            socket.onopen = function(event) {
+                updateStatus(true, 'Connected to ws://localhost:13520/scores');
+                console.log('WebSocket connected');
+            };
+            
+            socket.onmessage = function(event) {
+                try {
+                    const scoreData = JSON.parse(event.data);
+                    console.log('Received score:', scoreData);
+                    
+                    // Update last score display
+                    lastScoreDiv.textContent = `🎯 ${scoreData.score}`;
+                    lastTimeDiv.textContent = `Position: (${scoreData.position.x}, ${scoreData.position.y}) | ${new Date(scoreData.timestamp).toLocaleTimeString()}`;
+                    
+                    // Add to history
+                    addScoreToHistory(scoreData);
+                    
+                } catch (e) {
+                    console.error('Error parsing score data:', e);
+                    console.log('Raw message:', event.data);
+                }
+            };
+            
+            socket.onclose = function(event) {
+                updateStatus(false, 'Disconnected from ws://localhost:13520/scores');
+                console.log('WebSocket disconnected');
+            };
+            
+            socket.onerror = function(error) {
+                updateStatus(false, 'Connection error - is OpenDartboard running?');
+                console.error('WebSocket error:', error);
+            };
+        }
+        
+        function disconnect() {
+            if (socket) {
+                socket.close();
+                socket = null;
+            }
+        }
+        
+        function clearHistory() {
+            historyDiv.innerHTML = '<h3>Score History:</h3>';
+            scoreCount = 0;
+            lastScoreDiv.textContent = 'Waiting for scores...';
+            lastTimeDiv.textContent = '';
+        }
+        
+        // Button event listeners
+        connectBtn.addEventListener('click', connect);
+        disconnectBtn.addEventListener('click', disconnect);
+        clearBtn.addEventListener('click', clearHistory);
+        
+        // Auto-connect on page load
+        connect();
+        
+        // Test message (for debugging without dartboard)
+        function sendTestScore() {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                const testScore = {
+                    score: "20",
+                    position: { x: 150, y: 200 },
+                    confidence: 0.95,
+                    camera: 0,
+                    processing_time: 15,
+                    timestamp: Date.now()
+                };
+                
+                // Simulate receiving the message
+                const event = { data: JSON.stringify(testScore) };
+                socket.onmessage(event);
+            }
+        }
+        
+        // Add test button (remove in production)
+        const testBtn = document.createElement('button');
+        testBtn.textContent = 'Send Test Score';
+        testBtn.style.background = '#9c27b0';
+        testBtn.style.color = 'white';
+        testBtn.addEventListener('click', sendTestScore);
+        document.querySelector('.container').appendChild(testBtn);
+    </script>
+</body>
+</html>

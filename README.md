@@ -5,7 +5,7 @@
 - **Headless Scorer** — Uses a Raspberry Pi Zero 2 W with 3 cameras to detect darts and output scores in standard notation (T20, S5, D12, …) via a easy to consume WebSocket API.
 - **Computer Vision** — Lightweight OpenCV to run efficiently on a Pi Zero 2 W.
 
-The goal: **drop-in freedom** for home tinkerers who want “Automatic darts scoring" without closed hardware, subscriptions, or vendor lock-in.
+The goal: **drop-in freedom** for home tinkerers who want "Automatic darts scoring" without closed hardware, subscriptions, or vendor lock-in.
 
 ---
 
@@ -17,8 +17,8 @@ The goal: **drop-in freedom** for home tinkerers who want “Automatic darts sco
 | **Development** | Docker-based dev environment for consistent builds | ✅ works |
 | **MVP**         | Auto-calibration via OpenCV                        | ✅ works |
 | **MMR**         | Scoring vai OpenCV (or) YOLOv8-nano /w NCNN        | WIP      |
+| **API**         | WebSocket API for real-time score streaming        | ✅ works |
 | **Polish**      | Improved accuracy & Auto-calibration and CI/CD     | T.B.D    |
-| **Stretch**     | WebSocket API / HDMI ASCII output                  | T.B.D    |
 
 ---
 
@@ -28,6 +28,7 @@ The goal: **drop-in freedom** for home tinkerers who want “Automatic darts sco
 | ------------------- | --------------------------------- | ----------------------------------------- |
 | **Computer Vision** | `YOLOv8-nano` · `ncnn` · `OpenCV` | Optimized INT8 model for arm32            |
 | **Runtime**         | C++                               | High-performance dart detection           |
+| **API**             | `WebSocket` · `JSON`              | Real-time score streaming on port 13520   |
 | **Infrastructure**  | `systemd` services · `udev` rules | Reliable auto-start and camera management |
 | **Development**     | `Docker` · `Debian Bullseye`      | Reproducible build environment            |
 | **Distribution**    | `.deb` package                    | CI checks, One-command installation       |
@@ -61,9 +62,16 @@ git clone https://github.com/OpenDartboard/OpenDartboard.git
 ./make.sh
 sudo apt install ./opendartboard_0.x.0.deb
 
-# 2 Watch the scores
+# 2 Watch the scores (multiple options)
+# Option A: Via logs
 sudo journalctl -fu opendartboard.service
-# Will print: D20 / S5 / MISS / END etc.
+
+# Option B: Via WebSocket (JSON format)
+# Connect to ws://localhost:13520/scores
+# See docs/api.md for details
+
+# Option C: Test client
+# Open viewer/websocket_test.html in browser
 ```
 
 ## 5. Development
@@ -86,12 +94,21 @@ cmake -S . -B build -DCMAKE_PREFIX_PATH=/usr/local && cmake --build build -j4 &&
 
 ## 6. Roadmap (1.0)
 
-- Camera auto-calibration
-- Tip detection & scorring
-- WebSocket API & ASCII HDMI output
+- ✅ Camera auto-calibration
+- ✅ WebSocket API for real-time scores
+- Tip detection & scoring
 - Configurations/options
+- REST API for settings/calibration
 
-## 7. Contributing
+## 7. API Documentation
+
+See `docs/api.md` for WebSocket API specification and client examples.
+
+## . Custom Detector
+
+See `docs/detectors.md` for examples how to write you own detector if you wish.
+
+## 9. Contributing
 
 Pull requests are welcome!
 Please file an issue first — we’ll discuss approach & design.

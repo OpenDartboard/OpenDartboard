@@ -4,6 +4,9 @@
 #include <atomic>
 #include <opencv2/opencv.hpp>
 #include "detector/detector_interface.hpp"
+#include "../communication/websocket_service.hpp"
+#include "../communication/score_queue.hpp"
+#include <memory>
 
 using namespace std;
 
@@ -35,4 +38,7 @@ private:
 
   // Simple control
   atomic<bool> running{false};
+
+  std::shared_ptr<ScoreQueue> score_queue_;
+  std::unique_ptr<WebSocketService> websocket_service_;
 };

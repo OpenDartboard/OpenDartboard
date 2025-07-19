@@ -1,4 +1,4 @@
-# OpenDartboard Detector Plugins
+# OpenDartboard Detector Plugins 🎯
 
 OpenDartboard supports multiple detector types through a flexible plugin system. You can use built-in detectors or create custom ones.
 
