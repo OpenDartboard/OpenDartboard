@@ -74,6 +74,7 @@ add_executable(opendartboard
     # src/detector/geometry/detection/geometry_detection.cpp
     src/detector/geometry/detection/motion_processing.cpp
     src/detector/geometry/detection/dart_processing.cpp
+    src/detector/geometry/detection/score_processing.cpp
 )
 
 # Add include directories for easier includes

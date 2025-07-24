@@ -11,9 +11,9 @@ namespace bull_processing
     struct BullParams
     {
         // Strategy A: Bull's eye detection parameters
-        double minBullArea = 20.0;         // Minimum area for bull contour
-        double maxBullAreaPercent = 0.005; // Maximum area as percentage of total image (0.5%)
-        double minCircularity = 0.5;       // Minimum circularity for bull detection
+        double minBullArea = 20.0;          // Minimum area for bull contour
+        double maxBullAreaPercent = 0.0008; // Maximum area as percentage of total image (0.5%)
+        double minCircularity = 0.5;        // Minimum circularity for bull detection
 
         // Size-based scoring parameters
         double idealBullAreaPercent = 0.0008; // Ideal bull area as percentage of image (0.08%)

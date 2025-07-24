@@ -4,6 +4,7 @@
 #include "geometry_detector.hpp"
 #include "calibration/geometry_calibration.hpp"
 #include "detection/dart_processing.hpp"
+#include "detection/score_processing.hpp"
 #include "utils.hpp"
 
 using namespace cv;
@@ -39,34 +40,19 @@ DetectorResult GeometryDetector::process(const vector<Mat> &frames)
     // Process dart state detection
     dart_processing::DartStateResult dart_result = dart_processing::processDartState(frames, background_frames, motion_result.motion_finished, debug_mode);
 
-    // Lets now just mock the result, use previous_state, and current_state
-    // lets first compare if previous state is different from current state
-    if (dart_result.previous_state != dart_result.current_state)
+    // Process scoring using the new scoring system
+    score_processing::ScoreResult score_result = score_processing::processScore(background_frames, dart_result, calibrations, debug_mode);
+
+    // Only return result if scoring system says it's valid (state changed)
+    if (score_result.valid)
     {
         result.dart_detected = true;
-        // we should now check what it was
-        switch (dart_result.current_state)
-        {
-        case dart_processing::DartBoardState::CLEAN:
-            result.score = "END";
-            result.position = Point2f(-1, -1); // No dart position
-            result.confidence = 0.9f;          // Mock confidence
-            result.camera_index = 0;           // Assume first camera for now
-            break;
-        case dart_processing::DartBoardState::DART_1:
-        case dart_processing::DartBoardState::DART_2:
-        case dart_processing::DartBoardState::DART_3:
-            // random value of score for now from 1 to 20, need to include S, D, T prefix too!!
-            result.score = to_string(rand() % 20 + 1); // Mock score from 1 to 20
-            result.score = "D" + result.score;         // Mock score from 1 to 20
-            result.position = Point2f(100, 100);
-            result.confidence = 0.9f; // Mock confidence
-            result.camera_index = 0;  // Assume first camera for now
-            break;
-        }
+        result.score = score_result.score;
+        result.position = score_result.pixel_position;
+        result.confidence = score_result.confidence;
+        result.camera_index = score_result.camera_index;
     }
 
-    // log_debug("Processing time: " + to_string(result.processing_time_ms) + " ms");
     return result;
 }
 
@@ -81,7 +67,7 @@ bool GeometryDetector::initialize(vector<VideoCapture> &cameras)
 #endif
 
     // Try to load cached calibration first
-    calibrations = cache::geometry::load();
+    // calibrations = cache::geometry::load();
     if (!calibrations.empty())
     {
         // Already calibrated, just set initialized
