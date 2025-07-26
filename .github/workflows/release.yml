@@ -39,11 +39,27 @@ jobs:
           make build
           make deb VERSION=${{ steps.vars.outputs.VERSION }}
 
+      # 5. Change log
+      - name: Generate CHANGELOG output
+        id: changelog
+        run: |
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -n "$LAST_TAG" ]; then
+            git log "$LAST_TAG..HEAD" --pretty=format:"- %s"
+          else
+            git log --pretty=format:"- %s"
+          fi > changelog.txt
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          cat changelog.txt >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
       # 5. Upload .deb to the release
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*.deb
-          generate_release_notes: true # GitHub auto‑creates notes from commits
+          body: ${{ steps.changelog.outputs.changelog }}
+          # GitHub auto‑creates notes (disabled for manual releases)
+          # generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
