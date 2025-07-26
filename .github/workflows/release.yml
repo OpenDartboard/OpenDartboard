@@ -17,6 +17,10 @@ jobs:
       image: debian:12
       options: --platform linux/arm64
 
+    defaults:
+      run:
+        working-directory: /github/workspace
+
     steps:
       # 1. Checkout repo (full history so changelogs work later)
       - uses: actions/checkout@v4
