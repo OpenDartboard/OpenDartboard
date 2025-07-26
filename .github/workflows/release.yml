@@ -26,8 +26,8 @@ jobs:
       # 2. Install build & runtime deps
       - name: Install apt packages
         run: |
-          sudo apt-get update -y
-          xargs sudo apt-get install -y < apt-packages.txt
+          apt-get update -y
+          xargs apt-get install -y < apt-packages.txt
 
       # 3. Derive version from tag (refs/tags/v0.0.1 -> 0.0.1)
       - id: vars
