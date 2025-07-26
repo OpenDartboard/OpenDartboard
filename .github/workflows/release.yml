@@ -13,6 +13,10 @@ jobs:
   build-deb:
     runs-on: ubuntu-24.04-arm
 
+    container:
+      image: debian:12
+      options: --platform linux/arm64
+
     steps:
       # 1. Checkout repo (full history so changelogs work later)
       - uses: actions/checkout@v4
