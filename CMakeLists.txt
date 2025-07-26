@@ -36,20 +36,11 @@ if(NOT OpenCV_FOUND)
     set(OpenCV_LIBS ${OPENCV_LIBRARIES})
 endif()
 
-# Find ncnn package
-find_package(ncnn QUIET)
-if(NOT ncnn_FOUND)
-    message(WARNING "ncnn not found in system, using library in /usr/local")
-    set(NCNN_INCLUDE_DIRS "/usr/local/include/ncnn")
-    set(NCNN_LIBRARIES "/usr/local/lib/libncnn.a")
-endif()
-
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GSTREAMER REQUIRED gstreamer-1.0)
 pkg_check_modules(GSTREAMER_APP REQUIRED gstreamer-app-1.0)
 pkg_check_modules(GSTREAMER_BASE REQUIRED gstreamer-base-1.0)
 pkg_check_modules(GSTREAMER_VIDEO REQUIRED gstreamer-video-1.0)
-pkg_check_modules(TESSERACT REQUIRED tesseract)
 
 add_executable(opendartboard
     src/main.cpp
@@ -86,7 +77,6 @@ target_include_directories(opendartboard PRIVATE
     ${GSTREAMER_APP_INCLUDE_DIRS}
     ${GSTREAMER_BASE_INCLUDE_DIRS}
     ${GSTREAMER_VIDEO_INCLUDE_DIRS}
-    ${TESSERACT_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/src/utils
     /usr/include/opencv4  # Add explicit path to OpenCV headers
@@ -101,7 +91,6 @@ target_link_libraries(opendartboard
         ${GSTREAMER_APP_LIBRARIES}
         ${GSTREAMER_BASE_LIBRARIES}
         ${GSTREAMER_VIDEO_LIBRARIES}
-        ${TESSERACT_LIBRARIES}
         nlohmann_json::nlohmann_json
         ${CMAKE_DL_LIBS}
         Threads::Threads  # Add pthread linking

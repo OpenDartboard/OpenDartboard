@@ -2,8 +2,6 @@
 #include <opencv2/opencv.hpp>
 #include <iostream>
 
-#include <tesseract/baseapi.h>
-
 #include "orientation_processing.hpp"
 #include "perspective_processing.hpp"
 #include "geometry_calibration.hpp"
@@ -17,7 +15,7 @@ namespace orientation_processing
     // Create perspective-aware number region mask
     static Mat createNumberRegionMask(const Mat &frame, const DartboardCalibration &calib, bool enableDebug, const OrientationParams &params)
     {
-        log_debug("Creating number region mask for camera " + log_string(calib.camera_index));
+        log_debug("1Creating number region mask for camera " + log_string(calib.camera_index));
 
         // Get the outer doubles ellipse (our reference)
         RotatedRect outerDoubles = calib.ellipses.outerDoubleEllipse;

@@ -1,0 +1,41 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*" # e.g. vX.X.X
+
+jobs:
+  build-deb:
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      # 1. Checkout repo (full history so changelogs work later)
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 2. Install build & runtime deps
+      - name: Install apt packages
+        run: |
+          sudo apt-get update -y
+          xargs sudo apt-get install -y < apt-packages.txt
+
+      # 3. Derive version from tag (refs/tags/v0.0.1 -> 0.0.1)
+      - id: vars
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+
+      # 4. Build binary and .deb
+      - name: Build + Package
+        run: |
+          make build
+          make deb VERSION=${{ steps.vars.outputs.VERSION }}
+
+      # 5. Upload .deb to the release
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.deb
+          generate_release_notes: true # GitHub auto‑creates notes from commits
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

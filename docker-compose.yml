@@ -2,11 +2,18 @@ services:
   opendartboard:
     build: .
     image: opendartboard:latest
+    platform: linux/arm64
+    ports:
+      - "13520:13520" # for web socket interface (http://localhost:13520)
+      # debugging images
+      - "8081:8081"
+      - "8082:8082"
+      - "8083:8083"
     privileged: true  # Needed for camera access
     devices:
       - /dev/video0:/dev/video0
       - /dev/video1:/dev/video1
       - /dev/video2:/dev/video2
     volumes:
-      - .:/app
+      - ${PWD}:/app
     command: tail -f /dev/null  # Keeps container running for development

@@ -76,20 +76,25 @@ sudo journalctl -fu opendartboard.service
 
 ## 5. Development
 
+### 5.1 For macOS / Linux & Windows(PowerShell + Docker Desktop) users
+
 ```sh
 # Clone repository
 git clone https://github.com/OpenDartboard/OpenDartboard.git
 cd OpenDartboard
 
-# run build.deb.sh ONCE to get everything setup
-./build.deb.sh
+# Build the dev image (once)
+docker compose build opendartboard
 
-# login into you build
-docker run -it --rm -v $PWD:/app opendartboard:latest /bin/bash
+# Open an interactive shell with everything mounted
+# $env:PWD = (Get-Location).Path FOR WINDOWS
+docker compose run --rm opendartboard /bin/bash
 
-# make changes
-# rebuild & rerun (can use mock images)
-cmake -S . -B build -DCMAKE_PREFIX_PATH=/usr/local && cmake --build build -j4 && cp build/opendartboard /usr/local/bin/opendartboard && opendartboard --debug --cams mocks/cam_1.mp4,mocks/cam_2.mp4,mocks/cam_3.mp4 --width 1270 --height 720
+# Builds and installs binary
+make build
+
+# Run the binary with mocks
+opendartboard --debug --cams mocks/cam_1.mp4,mocks/cam_2.mp4,mocks/cam_3.mp4 --width 1280 --height 720
 ```
 
 ## 6. Roadmap (1.0)

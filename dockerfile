@@ -16,7 +16,7 @@ WORKDIR /app
 COPY . .
 
 # Install system deps, Python, git, etc. (this layer will be cached unless dependencies change) add --force-rebuild for a fresh rebuild
-RUN ./install.sh
+# RUN ./install.sh
 
 # Build everything (this only reruns if source changes or you touch build.sh)
-RUN ./make.sh
+# RUN ./make.sh
