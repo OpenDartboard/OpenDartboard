@@ -1,9 +1,13 @@
 name: Release
 
+permissions:
+  contents: write # grants GITHUB_TOKEN the ability to create GitHub Releases
+
 on:
   push:
     tags:
       - "v*" # e.g. vX.X.X
+  workflow_dispatch: # allows manual rebuilds
 
 jobs:
   build-deb:

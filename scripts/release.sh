@@ -10,7 +10,7 @@ new_tag="v${major}.${minor}.$((patch + 1))"
 
 # Step 3: Generate changelog from last tag
 echo "==> Generating changelog from ${last_tag} to HEAD..."
-changelog=$(git log "${last_tag}..HEAD" --pretty=format:"- %s")
+changelog=$(git log "${last_tag}..HEAD" --pretty=format:"- %s" 2>/dev/null || git log --pretty=format:"- %s")
 
 # Step 4: Tag with new version
 git tag -a "$new_tag" -m "Release $new_tag"$'\n\n'"$changelog"
@@ -22,3 +22,5 @@ git push origin "$new_tag"
 echo "Tagged $new_tag and pushed to origin"
 echo "---------- CHANGELOG ----------"
 echo "$changelog"
+
+
