@@ -3,6 +3,12 @@
   <a href="https://opendartboard.org/" rel="noopener" target="_blank"><img width="192" height="204" src="assets/logo2.png" alt="Opendartboard Logo"></a>
 </p>
 
+<style>
+    table {
+        width: 100%;
+    }
+</style>
+
 <h1 align="center">OpenDartboard</h1>
 
 <div align="center">
@@ -78,7 +84,7 @@ opendartboard --autocams
 
 | Phase           | Target                                             | Status (ETA) |
 | --------------- | -------------------------------------------------- | ------------ |
-| **Packaging**   | Debian package (.deb) for easy installation        | ✅ released  |
+| **Packaging**   | Debian package (.deb) for easy installation --     | ✅ released  |
 | **Development** | Docker‑based dev environment for consistent builds | ✅ ready     |
 | **MVP**         | Basic Auto‑calibration via OpenCV                  | ✅ done      |
 | **CI/CD**       | Basic CI pipelines & tagged releases               | ✅ live      |
@@ -91,7 +97,7 @@ opendartboard --autocams
 ## Tech Stack
 
 | Layer               | Tech                         | Notes                                |
-| ------------------- | ---------------------------- | ------------------------------------ |
+| ------------------- | ---------------------------- | :----------------------------------- |
 | **Computer Vision** | `OpenCV`                     | INT8‑optimised model for ARM         |
 | **Runtime**         | C++                          | High‑performance dart detection      |
 | **API**             | `WebSocket` · `JSON`         | Real‑time score streaming on `13520` |
