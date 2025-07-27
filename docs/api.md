@@ -16,7 +16,7 @@ The **main feature** - connects and receives live dart scores as JSON messages i
 
 ```json
 {
-  "score": "20",
+  "score": "D20",
   "position": { "x": 150, "y": 200 },
   "confidence": 0.95,
   "camera": 0,
@@ -30,8 +30,8 @@ The **main feature** - connects and receives live dart scores as JSON messages i
 | Field             | Type      | Range                                                | Description             |
 | ----------------- | --------- | ---------------------------------------------------- | ----------------------- |
 | `score`           | `string`  | `"S1"-"D20"`, `"BULL"`, `"OUTER"`, `"MISS"`, `"END"` | Dart score value        |
-| `position.x`      | `integer` | `0-640`                                              | X coordinate in pixels  |
-| `position.y`      | `integer` | `0-480`                                              | Y coordinate in pixels  |
+| `position.x`      | `integer` | `0-XXX`                                              | X coordinate in pixels  |
+| `position.y`      | `integer` | `0-XXX`                                              | Y coordinate in pixels  |
 | `confidence`      | `float`   | `0.0-1.0`                                            | Detection confidence    |
 | `camera`          | `integer` | `0-2`                                                | Camera index            |
 | `processing_time` | `integer` | `1-1000`                                             | Processing time in ms   |
@@ -166,6 +166,8 @@ val client = DartboardClient()
 client.connect()
 ```
 
+---
+
 ## HTTP REST API (Secondary)
 
 ### Health Check
@@ -179,13 +181,13 @@ GET http://<ip-adress>:13520/health
 ```json
 {
   "status": "ok",
-  "service": "OpenDartboard vX.X.X"
+  "service": "OpenDartboard"
 }
 ```
 
 ### Configuration Management
 
-#### Get Current Configuration
+#### [WIP] Get Current Configuration
 
 ```
 GET http://<ip-adress>:13520/config
@@ -195,25 +197,19 @@ GET http://<ip-adress>:13520/config
 
 ```json
 {
-  "detector_type": "geometry",
-  "camera_count": 3,
-  "fps": 30,
-  "width": 1280,
-  "height": 720,
-  "debug_mode": false
-  //.....
+  "key": "value"
 }
 ```
 
-#### Update Configuration
+#### [WIP] Update Configuration
 
 ```
 PUT http://<ip-adress>:13520/config
-Content-Type: application/json
+```
 
+```json
 {
-  "fps": 60,
-  "debug_mode": true
+  "key": "value"
 }
 ```
 
@@ -227,7 +223,7 @@ Content-Type: application/json
 
 ### Calibration Control
 
-#### Start Calibration Process
+#### [WIP] Start Calibration Process
 
 ```
 POST http://<ip-adress>:13520/calibrate/start
@@ -237,7 +233,7 @@ POST http://<ip-adress>:13520/calibrate/start
 
 ```json
 {
-  "status": "calibration_started"
+  "status": "started"
 }
 ```
 
@@ -251,41 +247,8 @@ GET http://<ip-adress>:13520/calibrate/status
 
 ```json
 {
-  "calibrating": false,
-  "progress": 100,
-  "step": "complete"
+  "calibrating": true
 }
-```
-
-### WebSocket Info (Fallback)
-
-```
-GET http://<ip-adress>:13520/scores
-```
-
-Returns info message for browsers accessing via HTTP instead of WebSocket.
-
-## 🔧 REST API Examples
-
-### cURL Commands
-
-```bash
-# Check health
-curl http://<ip-adress>:13520/health
-
-# Get configuration
-curl http://<ip-adress>:13520/config
-
-# Update configuration
-curl -X PUT http://<ip-adress>:13520/config \
-  -H "Content-Type: application/json" \
-  -d '{"fps": 60, "debug_mode": true}'
-
-# Start a  re-calibration (optional)
-curl -X POST http://<ip-adress>:13520/calibrate/start
-
-# Check calibration status (optional)
-curl http://<ip-adress>:13520/calibrate/status
 ```
 
 ## Error Handling
@@ -304,7 +267,6 @@ curl http://<ip-adress>:13520/calibrate/status
 
 ## Test Clients
 
-- **WebSocket**: Use `viewer/websocket_test.html` for real-time testing
 - **REST API**: Use cURL commands above or Postman/Insomnia
 
 ## Performance Notes

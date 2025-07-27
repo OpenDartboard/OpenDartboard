@@ -15,12 +15,12 @@
 
 </div>
 
-**OpenDartboard** is a hobby-friendly, fully FOSS toolkit for building an automatic _steel-tip_ dart–scoring station:
+**OpenDartboard** is a hobby-friendly, fully FOSS toolkit for building an automatic _steel-tip_ dart–scoring station at home or in a bar.
 
-- **Headless Scorer** — Uses a Raspberry Pi Zero 2 W with 3 cameras to detect darts and output scores in standard notation (T20, S5, D12, …) via a easy to consume WebSocket API.
-- **Computer Vision** — Lightweight OpenCV to run efficiently on a Pi Zero 2 W.
+- **Headless Scorer** — Use a Raspberry Pi Zero 2 W with 3 cameras to detect darts and output scores in standard notation (`T20`, `S5`, `D12`, …) via a easy to consume [WebSocket API](docs/api.md).
+- **Computer Vision** — Includes a lightweight OpenCV detector to run efficiently on a Pi Zero 2 W or build your own detector via a [Custom Detector](docs/detectors.md) plugin.
 
-The goal: **drop-in freedom** for home tinkerers who want "Automatic darts scoring" without closed hardware, subscriptions, or vendor lock-in.
+The goal: **drop-in freedom** for home tinkerers or bar owners who want "Automatic darts scoring" without closed hardware, subscriptions, or vendor lock-in.
 
 ## Table of Contents
 
@@ -61,7 +61,9 @@ opendartboard --autocams
 
 > **Tip**: Need a quick debug dashboard? Run [`opendartboard.github.io/debug`](https://opendartboard.github.io/debug/) in any modern browser to see the score output, camera feeds, calibrations images, and more.
 
-## Recommended clients
+## Clients
+
+🚧 We are working on a set of official clients to make it easier to use OpenDartboard. These will be available for various platforms, and will allow you to view scores, play, manage settings, and more.
 
 ```yml
 - **Web**:     [COMMING SOON] - A web client for viewing scores and managing settings.
@@ -73,6 +75,8 @@ opendartboard --autocams
 - **macOS**:   [COMMING SOON] - A macOS client for viewing scores and managing settings.
 - **TV's**:    [COMMING SOON] - A TV client for viewing scores on your big screen.
 ```
+
+For now, you can try out the [Debug Dashboard](https://opendartboard.github.io/debug/) or integrate with your own applications using the [WebSocket API](docs/api.md).
 
 ## Project Status & Roadmap
 
