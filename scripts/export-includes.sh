@@ -9,6 +9,9 @@ docker run --rm -v $PWD/.vscode/container-includes:/export opendartboard:latest 
 mkdir -p /export/opencv2 /export/ncnn
 cp -r /usr/include/opencv4/opencv2 /export/ 
 cp -r /usr/local/include/ncnn /export/
+cp -r /usr/include/linux /export/
+cp -r /usr/include/asm-generic /export/
+cp -r /usr/include/asm-generic /export/asm/
 '
 
 echo "Include files exported to .vscode/container-includes"

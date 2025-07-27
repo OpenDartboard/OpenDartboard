@@ -18,6 +18,8 @@ FetchContent_Declare(
     GIT_TAG v0.14.3
 )
 
+
+
 # Make dependencies available
 FetchContent_MakeAvailable(nlohmann_json httplib)
 
@@ -94,6 +96,12 @@ target_link_libraries(opendartboard
         nlohmann_json::nlohmann_json
         ${CMAKE_DL_LIBS}
         Threads::Threads  # Add pthread linking
+)
+
+# Define version for the project
+target_compile_definitions(opendartboard
+  PRIVATE
+    APP_VERSION="${APP_VERSION}"
 )
 
 target_compile_features(opendartboard PRIVATE cxx_std_17)

@@ -1,7 +1,9 @@
-.PHONY: build run
+.PHONY: build run deb release
 
-CMAKE_FLAGS=-DCMAKE_PREFIX_PATH=/usr/local \
-            -DCMAKE_CXX_FLAGS="-DDEBUG_SEEK_VIDEO -DDEBUG_VIA_VIDEO_INPUT"
+PROJECT_VERSION_VAL := $(if $(VERSION),$(VERSION),0.0.0-dev)
+CMAKE_FLAGS = -DCMAKE_PREFIX_PATH=/usr/local \
+              -DCMAKE_CXX_FLAGS="-DDEBUG_SEEK_VIDEO -DDEBUG_VIA_VIDEO_INPUT" \
+              -DAPP_VERSION=$(PROJECT_VERSION_VAL)
 
 build:
 	mkdir -p build
@@ -11,7 +13,7 @@ build:
 	@echo "\033[32mBuild completed successfully!\033[0m"
 
 run:
-	opendartboard --debug \
+	opendartboard  \
 		--cams mocks/cam_1.mp4,mocks/cam_2.mp4,mocks/cam_3.mp4 \
 		--width 1280 --height 720
 
@@ -35,3 +37,9 @@ endif
 	dpkg-deb --build dist/staging/opendartboard_$(VERSION) dist/
 
 	@echo "\033[32mBuilt .deb package: dist/opendartboard_$(VERSION).deb\033[0m"
+
+
+release:
+    # just run the ./scripts/release.sh script
+	@echo "\033[32mRunning release script...\033[0m"
+	@./scripts/release.sh
