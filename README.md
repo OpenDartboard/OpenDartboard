@@ -1,4 +1,19 @@
-# OpenDartboard 🎯
+<!-- markdownlint-disable-next-line -->
+<p align="center">
+  <a href="https://opendartboard.org/" rel="noopener" target="_blank"><img width="192" height="204" src="assets/logo2.png" alt="Opendartboard Logo"></a>
+</p>
+
+<h1 align="center">OpenDartboard</h1>
+
+<div align="center">
+
+[![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](https://github.com/opendartboard/opendartboard)
+[![Versions](https://img.shields.io/badge/versions-v0.1.2-green.svg)](https://github.com/opendartboard/opendartboard)
+[![Platform](https://img.shields.io/badge/platform-arm64-orange.svg)](https://github.com/opendartboard/opendartboard)
+[![Language](https://img.shields.io/badge/Language-C++-pink.svg)](https://github.com/opendartboard/opendartboard)
+[![Libs](https://img.shields.io/badge/Libs-OpenCV_•_httplib_•_json-white.svg)](https://github.com/opendartboard/opendartboard)
+
+</div>
 
 **OpenDartboard** is a hobby-friendly, fully FOSS toolkit for building an automatic _steel-tip_ dart–scoring station:
 
@@ -7,35 +22,72 @@
 
 The goal: **drop-in freedom** for home tinkerers who want "Automatic darts scoring" without closed hardware, subscriptions, or vendor lock-in.
 
----
+## Table of Contents
 
-## 1 Project Status & Short-term Goals
-
-| Phase           | Target                                             | ETA      |
-| --------------- | -------------------------------------------------- | -------- |
-| **Packaging**   | Debian package (.deb) for easy installation        | ✅ works |
-| **Development** | Docker-based dev environment for consistent builds | ✅ works |
-| **MVP**         | Auto-calibration via OpenCV                        | ✅ works |
-| **MMR**         | Scoring vai OpenCV (or) YOLOv8-nano /w NCNN        | WIP      |
-| **API**         | WebSocket API for real-time score streaming        | ✅ works |
-| **Polish**      | Improved accuracy & Auto-calibration and CI/CD     | T.B.D    |
+- [Quick Start](#quick-start)
+- [Project Status & Roadmap](#project-status--roadmap)
+- [Tech Stack](#tech-stack)
+- [Hardware Reference](#hardware-reference)
+- [Development Environment](#development-environment)
+- [API Documentation](#api-documentation)
+- [Custom Detectors](#custom-detectors)
+- [Contributing](#contributing)
 
 ---
 
-## 2 Tech Stack
+## Quick Start
 
-| Layer               | Tech                              | Notes                                     |
-| ------------------- | --------------------------------- | ----------------------------------------- |
-| **Computer Vision** | `YOLOv8-nano` · `ncnn` · `OpenCV` | Optimized INT8 model for arm32            |
-| **Runtime**         | C++                               | High-performance dart detection           |
-| **API**             | `WebSocket` · `JSON`              | Real-time score streaming on port 13520   |
-| **Infrastructure**  | `systemd` services · `udev` rules | Reliable auto-start and camera management |
-| **Development**     | `Docker` · `Debian Bullseye`      | Reproducible build environment            |
-| **Distribution**    | `.deb` package                    | CI checks, One-command installation       |
+```shell
+# 1 Flash MicroSD with Rasbperi Pi Imager (https://www.raspberrypi.com/software/) | Image: Raspberry Pi OS Lite (64-bit)
+# 1.1 - set hostname to `opendartboard`.
+# 1.2 - set username as `pi`, and any password.
+# 1.3 - set Wi-Fi name and password.
+# 1.2 - enable SSH in services.
+# 1.4 - Flash MicroSD - once complete power on Raspberry Pi
+# 1.5 - Connect to it with terminal/cmd using SSH:
+ssh pi@opendartboard.local
+
+# 2. Update the package lists
+sudo apt-get update
+
+# 3. Download & install the latest .deb release
+wget https://github.com/OpenDartboard/OpenDartboard/releases/download/v0.1.2/opendartboard_0.1.2-1_arm64.deb
+sudo apt install -y ./opendartboard_0.1.2-1_arm64.deb
+
+# 4. Run it and Watch the scores
+opendartboard --autocams
+```
+
+<!-- > **Tip**: Need a display? Run [`opendartboard.github.io`](https://opendartboard.github.io) in any modern browser to open the built‑in web scoreboard. -->
+
+## Project Status & Roadmap
+
+| Phase           | Target                                             | Status (ETA) |
+| --------------- | -------------------------------------------------- | ------------ |
+| **Packaging**   | Debian package (.deb) for easy installation        | ✅ released  |
+| **Development** | Docker‑based dev environment for consistent builds | ✅ ready     |
+| **MVP**         | Basic Auto‑calibration via OpenCV                  | ✅ done      |
+| **CI/CD**       | Basic CI pipelines & tagged releases               | ✅ live      |
+| **MMR**         | Scoring via OpenCV (`geometry_detector`)           | 🚧 WIP       |
+| **API**         | WebSocket API for real‑time score streaming        | ✅ v0.1      |
+| **Polish**      | Improved accuracy & self‑calibration               | 🗓 T.B.D.     |
 
 ---
 
-## 3 Hardware Reference
+## Tech Stack
+
+| Layer               | Tech                         | Notes                                |
+| ------------------- | ---------------------------- | ------------------------------------ |
+| **Computer Vision** | `OpenCV`                     | INT8‑optimised model for ARM         |
+| **Runtime**         | C++                          | High‑performance dart detection      |
+| **API**             | `WebSocket` · `JSON`         | Real‑time score streaming on `13520` |
+| **Infrastructure**  | `systemd` · `udev`           | Robust auto‑start & camera hot‑swap  |
+| **Development**     | `Docker` · `Debian Bullseye` | Reproducible builds                  |
+| **Distribution**    | `.deb` package               | CI‑checked, one‑command install      |
+
+---
+
+## Hardware Reference
 
 | Item         | Minimum spec                                       | Example                       |
 | ------------ | -------------------------------------------------- | ----------------------------- |
@@ -46,37 +98,7 @@ The goal: **drop-in freedom** for home tinkerers who want "Automatic darts scori
 
 ---
 
-## 4 Quick Start
-
-```shell
-# 0 Flash Raspberry Pi OS Lite (64-bit) via Rasbperi Pi Imager
-# 0.1 - set hostname to opendartboard
-# 0.2 - enable SSH
-# 0.3 - setup Wi-Fi SSID and password
-# 0.4 boot and connect to pi via SSH:
-ssh pi@opendartboard.local
-
-# 1 Build the package & On the Pi: install from package
-git clone https://github.com/OpenDartboard/OpenDartboard.git
-./install.sh
-./make.sh
-sudo apt install ./opendartboard_0.x.0.deb
-
-# 2 Watch the scores (multiple options)
-# Option A: Via logs
-sudo journalctl -fu opendartboard.service
-
-# Option B: Via WebSocket (JSON format)
-# Connect to ws://localhost:13520/scores
-# See docs/api.md for details
-
-# Option C: Test client
-# Open viewer/websocket_test.html in browser
-```
-
-## 5. Development
-
-### 5.1 For macOS / Linux & Windows(PowerShell + Docker Desktop) users
+## Development Environment
 
 ```sh
 # Clone repository
@@ -97,23 +119,14 @@ make build
 opendartboard --debug --cams mocks/cam_1.mp4,mocks/cam_2.mp4,mocks/cam_3.mp4 --width 1280 --height 720
 ```
 
-## 6. Roadmap (1.0)
+## API Documentation
 
-- ✅ Camera auto-calibration
-- ✅ WebSocket API for real-time scores
-- Tip detection & scoring
-- Configurations/options
-- REST API for settings/calibration
+See [`docs/api.md`](docs/api.md) for the full WebSocket specification & client examples.
 
-## 7. API Documentation
+## Custom Detectors
 
-See `docs/api.md` for WebSocket API specification and client examples.
+Want to experiment with your own CV pipeline? Check out [`docs/detectors.md`](docs/detectors.md) for implementation guides and examples.
 
-## . Custom Detector
+## Contributing
 
-See `docs/detectors.md` for examples how to write you own detector if you wish.
-
-## 9. Contributing
-
-Pull requests are welcome!
-Please file an issue first — we’ll discuss approach & design.
+Pull requests are welcome — but please open an issue first so we can discuss design & approach. 🎯

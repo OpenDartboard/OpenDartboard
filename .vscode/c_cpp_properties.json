@@ -6,13 +6,16 @@
                 "${workspaceFolder}/**",
                 "${workspaceFolder}/.vscode/container-includes"
             ],
-            "defines": [],
+            "defines": [
+                "APP_VERSION=\"0.0.0-dev\""   // any placeholder works
+            ],
             "macFrameworkPath": [],
             "compilerPath": "/usr/bin/clang++",
             "cStandard": "c17",
             "cppStandard": "c++17",
             "intelliSenseMode": "macos-clang-arm64"
         }
+        
     ],
     "version": 4
 }

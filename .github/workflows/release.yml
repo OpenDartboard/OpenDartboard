@@ -36,7 +36,7 @@ jobs:
       # 4. Build binary and .deb
       - name: Build + Package
         run: |
-          make build
+          make build VERSION=${{ steps.vars.outputs.VERSION }}
           make deb VERSION=${{ steps.vars.outputs.VERSION }}
 
       # 5. Upload .deb to the release
