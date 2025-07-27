@@ -3,18 +3,12 @@
   <a href="https://opendartboard.org/" rel="noopener" target="_blank"><img width="192" height="204" src="assets/logo2.png" alt="Opendartboard Logo"></a>
 </p>
 
-<style>
-    table {
-        width: 100%;
-    }
-</style>
-
 <h1 align="center">OpenDartboard</h1>
 
 <div align="center">
 
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](https://github.com/opendartboard/opendartboard)
-[![Versions](https://img.shields.io/badge/versions-v0.1.2-green.svg)](https://github.com/opendartboard/opendartboard)
+[![Versions](https://img.shields.io/badge/versions-v0.1.3-green.svg)](https://github.com/opendartboard/opendartboard)
 [![Platform](https://img.shields.io/badge/platform-arm64-orange.svg)](https://github.com/opendartboard/opendartboard)
 [![Language](https://img.shields.io/badge/Language-C++-pink.svg)](https://github.com/opendartboard/opendartboard)
 [![Libs](https://img.shields.io/badge/Libs-OpenCV_•_httplib_•_json-white.svg)](https://github.com/opendartboard/opendartboard)
@@ -58,8 +52,8 @@ ssh pi@opendartboard.local
 sudo apt-get update
 
 # 3. Download & install the latest .deb release
-wget https://github.com/OpenDartboard/OpenDartboard/releases/download/v0.1.2/opendartboard_0.1.2-1_arm64.deb
-sudo apt install -y ./opendartboard_0.1.2-1_arm64.deb
+wget https://github.com/OpenDartboard/OpenDartboard/releases/download/v0.1.3/opendartboard_0.1.3-1_arm64.deb
+sudo apt install -y ./opendartboard_0.1.3-1_arm64.deb
 
 # 4. Run it and Watch the scores
 opendartboard --autocams
