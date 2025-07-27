@@ -61,7 +61,7 @@ opendartboard --autocams
 
 > **Tip**: Need a quick debug dashboard? Run [`opendartboard.github.io/debug`](https://opendartboard.github.io/debug/) in any modern browser to see the score output, camera feeds, calibrations images, and more.
 
-## Recomended Clients
+## Recommended clients
 
 ```yml
 - **Web**:     [COMMING SOON] - A web client for viewing scores and managing settings.
