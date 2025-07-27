@@ -10,7 +10,7 @@ namespace bull_processing
 {
     Point processBull(const Mat &redGreenFrame, const Point &frameCenter, int camera_idx, bool debug_mode, const BullParams &params)
     {
-        log_info("Bull detection camera " + log_string(camera_idx) + " starting...");
+        log_debug("Bull detection camera " + log_string(camera_idx) + " starting...");
 
         // Step 1: Create blur mask
         Mat blurredFrame;
@@ -99,8 +99,8 @@ namespace bull_processing
             bestBullCenter = frameCenter;
         }
 
-        log_info("Bull detection complete - center=(" + log_string(bestBullCenter.x) +
-                 "," + log_string(bestBullCenter.y) + "), score=" + log_string(bestScore));
+        log_debug("Bull detection complete - center=(" + log_string(bestBullCenter.x) +
+                  "," + log_string(bestBullCenter.y) + "), score=" + log_string(bestScore));
 
         // Enhanced debug visualization
         if (debug_mode)

@@ -117,7 +117,7 @@ namespace cache
                     return false;
                 }
 
-                log_info("Saved " + to_string(calibrations.size()) + " calibrations to cache");
+                log_debug("Saved " + to_string(calibrations.size()) + " calibrations to cache");
                 return true;
             }
             catch (const exception &e)

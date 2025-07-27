@@ -142,7 +142,7 @@ namespace geometry_calibration
             }
         }
 
-        log_info("DARTBOARD CALIBRATION COMPLETED");
+        log_debug("DARTBOARD CALIBRATION COMPLETED");
         return calibrations;
     }
 

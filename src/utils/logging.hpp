@@ -20,7 +20,7 @@ namespace logging
     };
 
     // Global settings
-    static LogLevel globalLogLevel = LogLevel::WARNING;           // Default: show ERROR and WARNING only
+    static LogLevel globalLogLevel = LogLevel::INFO;              // Default: show ERROR and WARNING only
     static bool showTimestamp = false;                            // Console timestamps off by default
     static bool enableFileLogging = true;                         // File logging off by default
     static string logFilePath = "debug_frames/opendartboard.log"; // Default log file

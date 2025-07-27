@@ -491,7 +491,7 @@ namespace dart_processing
         // log
         string a = getDartBoardStateName(best_previous_state);
         string b = getDartBoardStateName(final_state);
-        log_info("FINAL State: From: " + a + " -> " + b);
+        log_debug("FINAL State: From: " + a + " -> " + b);
 
         // Set ALL cameras to the final state
         for (size_t i = 0; i < previous_states.size(); i++)
@@ -504,7 +504,7 @@ namespace dart_processing
         result.previous_state = best_previous_state;
         best_previous_state = final_state;
 
-        log_info("--------------------------");
+        log_info(""); // empty line for readability
 
         return result;
     }

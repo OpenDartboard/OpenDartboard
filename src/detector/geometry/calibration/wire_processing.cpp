@@ -235,7 +235,7 @@ namespace wire_processing
     {
         vector<Point2f> wirePoints;
 
-        log_info("STARTING WIRE DETECTION for camera " + log_string(calib.camera_index));
+        log_debug("STARTING WIRE DETECTION for camera " + log_string(calib.camera_index));
 
         // Get the wire mask (areas between dartboard segments)
         Mat wireMask = detectMetalWires(mask, colorMask, calib);

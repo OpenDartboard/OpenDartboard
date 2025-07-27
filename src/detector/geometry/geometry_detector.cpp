@@ -109,13 +109,13 @@ bool GeometryDetector::initialize(vector<VideoCapture> &cameras)
             // Save calibration for future use
             if (cache::geometry::save(calibrations))
             {
-                log_info("Saved calibration");
+                log_debug("Saved calibration");
             }
 
             // Save background frames for dart detection
             if (cache::geometry::saveBackgroundFrames(background_frames))
             {
-                log_info("Saved background frames");
+                log_debug("Saved background frames");
             }
 
             initialized = true;

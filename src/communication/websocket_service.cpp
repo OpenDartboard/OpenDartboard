@@ -264,7 +264,7 @@ void WebSocketService::start()
 
     running_ = true;
     worker_thread_ = thread(&WebSocketService::run, this);
-    log_info("WebSocket service starting on port " + to_string(port_));
+    log_debug("WebSocket service starting on port " + to_string(port_));
 }
 
 void WebSocketService::stop()

@@ -40,7 +40,7 @@ namespace camera
         for (size_t i = 0; i < camera_sources.size(); i++)
         {
             VideoCapture cap;
-            log_info("Opening camera " + log_string(i + 1) + ": " + camera_sources[i]);
+            log_debug("Opening camera " + log_string(i + 1) + ": " + camera_sources[i]);
 
             if (isVideoFile(camera_sources[i]))
             {
@@ -56,7 +56,7 @@ namespace camera
                     {
                         int target_frame = static_cast<int>(video_fps * seek_seconds);
                         cap.set(CAP_PROP_POS_FRAMES, target_frame);
-                        log_info("Seeked video " + log_string(i + 1) + " forward by " + log_string(seek_seconds) + " seconds (frame " + log_string(target_frame) + ")");
+                        log_debug("Seeked video " + log_string(i + 1) + " forward by " + log_string(seek_seconds) + " seconds (frame " + log_string(target_frame) + ")");
                     }
                     else
                     {

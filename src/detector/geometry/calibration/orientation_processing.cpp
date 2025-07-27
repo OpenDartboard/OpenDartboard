@@ -178,7 +178,7 @@ namespace orientation_processing
     // Determine camera position and calculate comprehensive orientation data
     static OrientationData determineCameraPosition(const vector<pair<Point2f, Point2f>> &clipWires, const DartboardCalibration &calib)
     {
-        log_info("=== DETERMINING CAMERA POSITION FOR CAMERA " + log_string(calib.camera_index) + " ===");
+        log_debug("=== DETERMINING CAMERA POSITION FOR CAMERA " + log_string(calib.camera_index) + " ===");
 
         OrientationData result;
         result.camera_index = calib.camera_index;
@@ -324,12 +324,12 @@ namespace orientation_processing
         }
 
         // STEP 4: Debug output
-        log_info("Camera " + log_string(calib.camera_index) + " Position: " + cameraPositionToString(result.cameraPosition));
-        log_info("Camera " + log_string(calib.camera_index) + " Wedge Number: " + log_string(result.wedgeNumber));
-        log_info("Camera " + log_string(calib.camera_index) + " South Wire Index: " + log_string(result.southWireIndex));
-        log_info("Camera " + log_string(calib.camera_index) + " Wedge 20 Wire Index: " + log_string(result.wedge20WireIndex));
-        log_info("Camera " + log_string(calib.camera_index) + " Angle Offset: " + log_string(result.angleOffsetFromSouth) + "°");
-        log_info("=== END CAMERA POSITION DETERMINATION ===");
+        log_debug("Camera " + log_string(calib.camera_index) + " Position: " + cameraPositionToString(result.cameraPosition));
+        log_debug("Camera " + log_string(calib.camera_index) + " Wedge Number: " + log_string(result.wedgeNumber));
+        log_debug("Camera " + log_string(calib.camera_index) + " South Wire Index: " + log_string(result.southWireIndex));
+        log_debug("Camera " + log_string(calib.camera_index) + " Wedge 20 Wire Index: " + log_string(result.wedge20WireIndex));
+        log_debug("Camera " + log_string(calib.camera_index) + " Angle Offset: " + log_string(result.angleOffsetFromSouth) + "°");
+        log_debug("=== END CAMERA POSITION DETERMINATION ===");
 
         return result;
     }
@@ -341,7 +341,7 @@ namespace orientation_processing
         bool enableDebug,
         const OrientationParams &params)
     {
-        log_info("STARTING ORIENTATION DETECTION for camera " + log_string(calib.camera_index));
+        log_debug("STARTING ORIENTATION DETECTION for camera " + log_string(calib.camera_index));
 
         // Safety checks
         if (frame.empty())

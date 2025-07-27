@@ -86,6 +86,7 @@ void Scorer::run()
     running = true;
     log_info("Scorer running with " + to_string(camera_sources.size()) + " cameras");
     log_info("Using detector: " + detector_type_name);
+    cout << "-------------------------------------" << endl;
 
     while (running)
     {

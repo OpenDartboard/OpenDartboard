@@ -88,7 +88,7 @@ private:
 public:
     static std::unique_ptr<DetectorInterface> createDetector(const std::string &detector_type, bool debug_mode, int target_width, int target_height, int target_fps)
     {
-        log_info("Creating detector: " + detector_type);
+        log_debug("Creating detector: " + detector_type);
 
         switch (stringToDetectorType(detector_type))
         {
