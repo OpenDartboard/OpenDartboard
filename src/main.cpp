@@ -3,6 +3,7 @@
 #include "utils/debug.hpp"
 #include "utils/signals.hpp"
 #include "utils/logging.hpp"
+#include "utils/autocam.hpp"
 #include <iostream>
 #include <vector>
 #include <string>
@@ -12,7 +13,7 @@
 using namespace std;
 
 // version string for the application
-const string version = "0.1.0"; // Update this as needed
+const string version = APP_VERSION;
 
 int main(int argc, char **argv)
 {
@@ -24,9 +25,9 @@ int main(int argc, char **argv)
 
   // Parse command line arguments with defaults
   string model_path = getArg(argc, argv, "--model", "/usr/local/share/opendartboard/models/dart.param");
-  vector<string> cams = getArgVector(argc, argv, "--cams", "/dev/video0,/dev/video1,/dev/video2");
-  int width = getArg(argc, argv, "--width", 640);
-  int height = getArg(argc, argv, "--height", 360);
+  bool useAuto = hasFlag(argc, argv, "--autocams");
+  int width = getArg(argc, argv, "--width", 1280);
+  int height = getArg(argc, argv, "--height", 720);
   int fps = getArg(argc, argv, "--fps", 15);
   bool debug_mode = hasFlag(argc, argv, "--debug") || hasFlag(argc, argv, "-d");
   bool quite_mode = hasFlag(argc, argv, "--quiet") || hasFlag(argc, argv, "-q");
@@ -48,6 +49,18 @@ int main(int argc, char **argv)
 
   // Print startup and configuration information
   debug::printStartup("OpenDartboard", version);
+
+  // setup cams
+  vector<string> cams;
+  if (useAuto)
+  {
+    cams = autocam::detectAndLock(/*max*/ 3, width, height, fps);
+  }
+  else
+  {
+    cams = getArgVector(argc, argv, "--cams", "/dev/video0,/dev/video1,/dev/video2");
+  }
+
   debug::printConfig(width, height, fps, model_path, cams);
 
   // Initialise the scorer with debug mode if requested

@@ -48,8 +48,9 @@ namespace debug
         std::cout << "Options:\n";
         std::cout << "  --model <path>       Path to the AI model file (default: /usr/local/share/opendartboard/models/dart.param)\n";
         std::cout << "  --cams <cameras>     Comma-separated list of camera devices (default: /dev/video0,/dev/video1,/dev/video2)\n";
-        std::cout << "  --width <width>      Frame width (default: 640)\n";
-        std::cout << "  --height <height>    Frame height (default: 360)\n";
+        std::cout << "  --autocams           Automatically detect and lock up to 3 cameras\n";
+        std::cout << "  --width <width>      Frame width (default: 1280)\n";
+        std::cout << "  --height <height>    Frame height (default: 720)\n";
         std::cout << "  --fps <fps>          Frames per second (default: 15)\n";
         std::cout << "  --detector <type>    Detector type: geometry, ai, custom (default: geometry)\n";
         std::cout << "  --debug, -d          Enable debug mode (saves frames to debug_frames/ directory)\n";
