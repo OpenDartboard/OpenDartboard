@@ -9,20 +9,30 @@
 </style>
 </head>
 <body>
-    <div> <img id="cam0"><br/></div>
-    <div> <img id="cam1"><br/></div>
-    <div> <img id="cam2"><br/></div>
+    <div> <img id="stream0"><br/></div>
+    <div> <img id="stream1"><br/></div>
+    <div> <img id="stream2"><br/></div>
+    <div> <img id="stream3"><br/></div>
+    <div> <img id="stream4"><br/></div>
+    <div> <img id="stream5"><br/></div>
+    <div> <img id="stream6"><br/></div>
+    <div> <img id="stream7"><br/></div>
 <script>
 const urls = [
-  "http://localhost:8080/", 
-  "http://localhost:8081/", 
-  "http://localhost:8082/"
+  "http://localhost:8081/", // raw
+  "http://localhost:8082/", // motion 
+  "http://localhost:8083/", // motion2
+  "http://localhost:8084/", // dif stream (1fps)
+  "http://localhost:8085/", // tresh stream (1fps)
+  "http://localhost:8086/", // tresh diff stream (1fps)
+  "http://localhost:8087/", // tip stream (1fps)
+  "http://localhost:8088/", // points on screen stream (1fps)
 ];
 
 urls.forEach((u, i) => connect(i, u));
 
 function connect(idx, url){
-  const img   = document.getElementById("cam"+idx);
+  const img   = document.getElementById("stream"+idx);
   let stamp    = Date.now();                       // cache-buster
   img.src      = url + "?t=" + stamp;
   // img.onerror  = () => setTimeout(()=>connect(idx,url), 1000); // retry 1 s later

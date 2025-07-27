@@ -25,7 +25,7 @@
 class streamer
 {
 public:
-    explicit streamer(uint16_t port = 8080, int fps = 30)
+    explicit streamer(uint16_t port = 8081, int fps = 30)
         : port_(port), periodUs_(1'000'000 / std::max(1, fps)),
           lastReport_(std::chrono::steady_clock::now())
     {

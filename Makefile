@@ -13,7 +13,7 @@ build:
 	@echo "\033[32mBuild completed successfully!\033[0m"
 
 run:
-	opendartboard  \
+	opendartboard --debug \
 		--cams mocks/cam_1.mp4,mocks/cam_2.mp4,mocks/cam_3.mp4 \
 		--width 1280 --height 720
 

@@ -4,11 +4,16 @@ services:
     image: opendartboard:latest
     platform: linux/arm64
     ports:
-      - "13520:13520" # for web socket interface (http://localhost:13520)
+      - "13520:13520" # for web socket interface and rest api's (http://localhost:13520)
       # debugging images
-      - "8081:8081"
-      - "8082:8082"
-      - "8083:8083"
+      - "8081:8081" # raw stream
+      - "8082:8082" # motion stream
+      - "8083:8083" # motion2 stream
+      - "8084:8084" # dart diff stream
+      - "8085:8085" # dart thresh stream
+      - "8086:8086" # dart thresh diff stream
+      - "8087:8087" # dart tip stream
+      - "8088:8088" # points on screen stream
     privileged: true  # Needed for camera access
     devices:
       - /dev/video0:/dev/video0

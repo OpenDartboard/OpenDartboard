@@ -1,5 +1,6 @@
 #include "score_processing.hpp"
 #include "utils.hpp"
+#include "utils/streamer.hpp"
 #include "../calibration/geometry_calibration.hpp"
 
 using namespace cv;
@@ -7,6 +8,10 @@ using namespace std;
 
 namespace score_processing
 {
+
+    static bool initialized = false;
+    static unique_ptr<streamer> point_on_screen_streamer;
+
     // Helper: Check if point is inside ellipse (pure math)
     bool isPointInEllipse(Point2f point, const RotatedRect &ellipse)
     {
@@ -153,6 +158,14 @@ namespace score_processing
 
     ScoreResult processScore(const vector<Mat> &background_frames, const dart_processing::DartStateResult &dart_result, const vector<DartboardCalibration> &calibrations, bool debug_mode)
     {
+
+        if (!initialized)
+        {
+            log_debug("SCORE: Initializing score processing");
+            point_on_screen_streamer = make_unique<streamer>(8088, 1);
+            initialized = true;
+        }
+
         ScoreResult result;
 
         if (dart_result.previous_state == dart_result.current_state)
@@ -180,6 +193,8 @@ namespace score_processing
             Point2f best_tip_position(-1, -1);
             Point2f best_center_position(-1, -1);
 
+            vector<Mat> points_on_screen; // For debug images
+
             for (size_t i = 0; i < dart_result.camera_results.size(); i++)
             {
 
@@ -199,6 +214,8 @@ namespace score_processing
                             FONT_HERSHEY_SIMPLEX, 0.5, Scalar(255, 0, 0), 1);
                     system("mkdir -p debug_frames/score_processing");
                     imwrite("debug_frames/score_processing/point_on_screen" + to_string(i) + ".jpg", some_mat);
+
+                    points_on_screen.push_back(some_mat);
                 }
 
                 if (dart_result.camera_results[i].tip_found)
@@ -207,6 +224,18 @@ namespace score_processing
                     best_tip_position = dart_result.camera_results[i].tip_position;
                     best_center_position = dart_result.camera_results[i].center_position;
                     // break; // Take the first camera with a tip
+                }
+            }
+
+            if (debug_mode)
+            {
+                try
+                {
+                    point_on_screen_streamer->push(debug::createCombinedFrame(points_on_screen, "points_on_screen"));
+                }
+                catch (const std::exception &e)
+                {
+                    log_error("Failed to push points_on_screen frame: " + string(e.what()));
                 }
             }
 

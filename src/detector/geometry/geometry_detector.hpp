@@ -34,6 +34,6 @@ protected:
 
     // Debugging streamers for visual output
 #ifdef DEBUG_VIA_VIDEO_INPUT
-    unique_ptr<streamer> raw_streamer; // Port 8080 - Raw camera feeds
+    unique_ptr<streamer> raw_streamer; // Raw camera feeds
 #endif
 };

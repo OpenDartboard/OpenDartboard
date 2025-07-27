@@ -1,5 +1,6 @@
 #include "dart_processing.hpp"
 #include "utils.hpp"
+#include "utils/streamer.hpp"
 
 using namespace cv;
 using namespace std;
@@ -23,6 +24,12 @@ namespace dart_processing
     // Working backgrounds - one per camera
     static vector<Mat> working_backgrounds;
 
+    // Streamers for debugging
+    static unique_ptr<streamer> dart_diff_streamer;
+    static unique_ptr<streamer> dart_thresh_streamer;
+    static unique_ptr<streamer> dart_thresh_diff_streamer;
+    static unique_ptr<streamer> dart_tip_streamer;
+
     // get name of ENUM
     string getDartBoardStateName(DartBoardState state)
     {
@@ -41,7 +48,7 @@ namespace dart_processing
         }
     }
 
-    pair<Point2f, Point2f> detectTipAndCenter(const Mat &binary_thresh, bool debug_mode, int camera_id)
+    pair<Point2f, Point2f> detectTipAndCenter(const Mat &binary_thresh, bool debug_mode, int camera_id, vector<Mat> &dart_tips)
     {
         Point2f tip_position(0, 0);
         Point2f center_position(0, 0);
@@ -214,6 +221,9 @@ namespace dart_processing
             // Save debug image
             system("mkdir -p debug_frames/dart_processing");
             imwrite("debug_frames/dart_processing/tip_detection_cam_" + to_string(camera_id) + ".jpg", debug_img);
+
+            // Add to debug vector / streams
+            dart_tips.push_back(debug_img);
         }
 
         return make_pair(tip_position, center_position);
@@ -224,10 +234,21 @@ namespace dart_processing
     {
         DartStateResult result;
 
+        // Check if we have initialized
         if (!initialized)
         {
             accumulated_frames.resize(current_frames.size());
             working_backgrounds.resize(current_frames.size()); // Initialize working backgrounds
+
+            if (debug_mode)
+            {
+                // Initialize streamers for debugging (1fps is sufficient for debugging)
+                dart_diff_streamer = make_unique<streamer>(8084, 1);
+                dart_thresh_streamer = make_unique<streamer>(8085, 1);
+                dart_thresh_diff_streamer = make_unique<streamer>(8086, 1);
+                dart_tip_streamer = make_unique<streamer>(8087, 1);
+            }
+
             initialized = true;
         }
 
@@ -285,6 +306,12 @@ namespace dart_processing
         // Process all cameras - use pre-computed averages
         vector<DartBoardState> camera_states;
 
+        // debuging verctors of frames
+        vector<Mat> dart_diffs;
+        vector<Mat> dart_threshs;
+        vector<Mat> dart_thresh_diffs;
+        vector<Mat> dart_tips;
+
         for (size_t i = 0; i < current_frames.size(); i++)
         {
 
@@ -329,6 +356,10 @@ namespace dart_processing
                 imwrite("debug_frames/dart_processing/diff_cam_" + to_string(i) + ".jpg", diff);
                 imwrite("debug_frames/dart_processing/thresh_cam_" + to_string(i) + ".jpg", thresh);
                 imwrite("debug_frames/dart_processing/averaged_cam_" + to_string(i) + ".jpg", averaged_frame);
+
+                // Store debug frames for visualization
+                dart_diffs.push_back(diff);
+                dart_threshs.push_back(thresh);
             }
 
             // set camera result
@@ -374,11 +405,6 @@ namespace dart_processing
                     morphologyEx(single_thresh, single_thresh, MORPH_OPEN, morph_kernel);   // Open small noise
                     morphologyEx(single_thresh, single_thresh, MORPH_CLOSE, morph_kernel2); // Close smaller gaps in darts
                     morphologyEx(single_thresh, single_thresh, MORPH_OPEN, morph_kernel2);  // Open smaller noise
-
-                    if (debug_mode)
-                    {
-                        imwrite("debug_frames/dart_processing/diff_working_cam_" + to_string(i) + ".jpg", diff_working);
-                    }
                 }
                 else
                 {
@@ -389,7 +415,7 @@ namespace dart_processing
                 working_backgrounds[i] = averaged_frame.clone();
 
                 // Use smart tip detection
-                auto tip_and_center = detectTipAndCenter(single_thresh, debug_mode, static_cast<int>(i));
+                auto tip_and_center = detectTipAndCenter(single_thresh, debug_mode, static_cast<int>(i), dart_tips);
                 Point2f tip_pos = tip_and_center.first;
                 Point2f center_pos = tip_and_center.second;
 
@@ -431,6 +457,9 @@ namespace dart_processing
             {
                 imwrite("debug_frames/dart_processing/diff_thresh_cam_" + to_string(i) + ".jpg", single_thresh);
 
+                // Store debug frames for visualization
+                dart_thresh_diffs.push_back(single_thresh);
+
                 // debug output
                 string a = getDartBoardStateName(previous_states[i]);
                 string b = getDartBoardStateName(candidate_state);
@@ -441,6 +470,22 @@ namespace dart_processing
             previous_states[i] = candidate_state;
             // add to result
             result.camera_results[i].detected_state = candidate_state;
+        }
+
+        // debug via streamers
+        if (debug_mode)
+        {
+            try
+            {
+                dart_diff_streamer->push(debug::createCombinedFrame(dart_diffs, "dart_diffs"));
+                dart_thresh_streamer->push(debug::createCombinedFrame(dart_threshs, "dart_threshs"));
+                dart_thresh_diff_streamer->push(debug::createCombinedFrame(dart_thresh_diffs, "dart_thresh_diffs"));
+                dart_tip_streamer->push(debug::createCombinedFrame(dart_tips, "dart_tips"));
+            }
+            catch (const std::exception &e)
+            {
+                log_error("Error pushing debug frames: " + string(e.what()));
+            }
         }
 
         // Now we should have the results for all cameras, we need to see what global state we should be at.

@@ -198,6 +198,13 @@ namespace debug
                         Point(i * frameWidth + 10, 60),
                         FONT_HERSHEY_SIMPLEX, 0.6, Scalar(255, 255, 255), 2);
             }
+            else
+            {
+                // put black frame
+                Rect roi(i * frameWidth, 0, frameWidth, frameHeight);
+                Mat blackFrame = Mat::zeros(frameHeight, frameWidth, frames[0].type());
+                blackFrame.copyTo(combined(roi));
+            }
         }
 
         return combined;

@@ -46,8 +46,8 @@ namespace motion_processing
 
             if (debug_mode)
             {
-                motion_streamer = make_unique<streamer>(8081, 30);
-                motion2_streamer = make_unique<streamer>(8082, 30);
+                motion_streamer = make_unique<streamer>(8082, 15);
+                motion2_streamer = make_unique<streamer>(8083, 15);
             }
 
             // Return no motion on first frame

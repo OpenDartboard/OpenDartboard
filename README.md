@@ -25,6 +25,7 @@ The goal: **drop-in freedom** for home tinkerers who want "Automatic darts scori
 ## Table of Contents
 
 - [Quick Start](#quick-start)
+- [Recommended Clients](#recommended-clients)
 - [Project Status & Roadmap](#project-status--roadmap)
 - [Tech Stack](#tech-stack)
 - [Hardware Reference](#hardware-reference)
@@ -58,7 +59,20 @@ sudo apt install -y ./opendartboard_0.1.2-1_arm64.deb
 opendartboard --autocams
 ```
 
-<!-- > **Tip**: Need a display? Run [`opendartboard.github.io`](https://opendartboard.github.io) in any modern browser to open the built‑in web scoreboard. -->
+> **Tip**: Need a quick debug dashboard? Run [`opendartboard.github.io/debug`](https://opendartboard.github.io/debug/) in any modern browser to see the score output, camera feeds, calibrations images, and more.
+
+## Recomended Clients
+
+```yml
+- **Web**:     [COMMING SOON] - A web client for viewing scores and managing settings.
+- **Android**: [COMMING SOON] - A native Android app to connect to your OpenDartboard server.
+- **iOS**:     [COMMING SOON] - An iOS app to connect to your OpenDartboard server.
+- **Tablet**:  [COMMING SOON] - A tablet client for viewing scores and managing settings.
+- **Windows**: [COMMING SOON] - A Windows client for viewing scores and managing settings.
+- **Linux**:   [COMMING SOON] - A Linux client for viewing scores and managing settings.
+- **macOS**:   [COMMING SOON] - A macOS client for viewing scores and managing settings.
+- **TV's**:    [COMMING SOON] - A TV client for viewing scores on your big screen.
+```
 
 ## Project Status & Roadmap
 
@@ -94,7 +108,7 @@ opendartboard --autocams
 | SBC          | Raspberry Pi Zero 2 W (+ self-powered USB 2 hub)   | Waveshare USB HUB HAT (B)     |
 | Cameras (×3) | USB 2.0 webcams outputting MJPEG @ 1280x720 30 fps | HBVCAM OV2710 100°            |
 | Lighting     | 360° LED ring                                      | DIY SmartLite 12 V LED 6000 K |
-| Power        | 5 V / 3 A PSU                                      | Any USB-C PD brick + adapter  |
+| Power        | 5 V / 3 A PSU                                      | Any USB PD brick + adapter    |
 
 ---
 
@@ -109,8 +123,8 @@ cd OpenDartboard
 docker compose build opendartboard
 
 # Open an interactive shell with everything mounted
-# $env:PWD = (Get-Location).Path FOR WINDOWS
-docker compose run --rm opendartboard /bin/bash
+# Run `$env:PWD = (Get-Location).Path` #FOR WINDOWS
+docker compose run --rm --service-ports opendartboard /bin/bash
 
 # Builds and installs binary
 make build

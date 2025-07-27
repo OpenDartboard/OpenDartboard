@@ -61,7 +61,7 @@ bool GeometryDetector::initialize(vector<VideoCapture> &cameras)
 {
 #ifdef DEBUG_VIA_VIDEO_INPUT
     // Initialize multiple debug streamers
-    raw_streamer = make_unique<streamer>(8080, cameras[0].get(cv::CAP_PROP_FPS));
+    raw_streamer = make_unique<streamer>(8081, cameras[0].get(cv::CAP_PROP_FPS));
     cv::Mat startup_img_raw(target_height, target_width, CV_8UC3, cv::Scalar::all(0));
     cv::putText(startup_img_raw, "Raw Cameras", {50, 100}, cv::FONT_HERSHEY_SIMPLEX, 1.2, {0, 255, 0}, 2);
 #endif

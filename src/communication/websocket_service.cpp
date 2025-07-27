@@ -389,12 +389,8 @@ void WebSocketService::run()
         server_->Get("/config", [](const httplib::Request &req, httplib::Response &res)
                      {
             json config;
-            config["detector_type"] = "geometry";
-            config["camera_count"] = 3;
-            config["fps"] = 30;
-            config["width"] = 1280;
-            config["height"] = 720;
-            config["debug_mode"] = false;
+            // TODO: return actual configuration
+            config["todo"] = "yes";
             res.set_content(config.dump(), "application/json"); });
 
         server_->Put("/config", [](const httplib::Request &req, httplib::Response &res)
@@ -402,8 +398,8 @@ void WebSocketService::run()
             try {
                 json new_config = json::parse(req.body);
                 // TODO: Apply configuration changes
-                log_info("Configuration updated: " + new_config.dump());
-                res.set_content("{\"status\":\"updated\"}", "application/json");
+                log_info("TODO: Configuration updated: " + new_config.dump());
+                res.set_content("{\"status\":\"(TODO)updated\"}", "application/json");
             } catch (const exception& e) {
                 res.status = 400;
                 res.set_content("{\"error\":\"Invalid JSON\"}", "application/json");
@@ -413,20 +409,86 @@ void WebSocketService::run()
         server_->Post("/calibrate/start", [](const httplib::Request &req, httplib::Response &res)
                       {
             // TODO: Start calibration process
-            res.set_content("{\"status\":\"calibration_started\"}", "application/json"); });
+            res.set_content("{\"status\":\"(TODO)calibration_started\"}", "application/json"); });
 
         server_->Get("/calibrate/status", [](const httplib::Request &req, httplib::Response &res)
                      {
             json status;
-            status["calibrating"] = false;
-            status["progress"] = 100;
-            status["step"] = "complete";
+            // TODO: return actual calibration status
+            status["todo"] = "yes";
             res.set_content(status.dump(), "application/json"); });
+
+        server_->Get("/debug/list", [](const httplib::Request &req, httplib::Response &res)
+                     {
+            json files = json::array();
+            
+            for (const auto& entry : filesystem::recursive_directory_iterator("debug_frames")) {
+                if (entry.is_regular_file() && entry.path().extension() == ".jpg") {
+                    string path = entry.path().string();
+                    // Remove debug_frames/ prefix - C++17 compatible
+                    if (path.substr(0, 13) == "debug_frames/") {
+                        path = path.substr(13);
+                    }
+                    files.push_back(path);
+                }
+            }
+            
+            res.set_content(files.dump(), "application/json"); });
+
+        server_->Get("/debug/logs", [](const httplib::Request &req, httplib::Response &res)
+                     {
+            // Use tail command for fast last N lines
+            int result = system("tail -100 debug_frames/opendartboard.log > /tmp/recent_logs.txt 2>/dev/null");
+            if (result != 0) {
+                res.set_content("[]", "application/json");
+                return;
+            }
+            
+            ifstream file("/tmp/recent_logs.txt");
+            if (!file) {
+                res.set_content("[]", "application/json");
+                return;
+            }
+            
+            json logs = json::array();
+            string line;
+            while (getline(file, line)) {
+                if (!line.empty()) {
+                    logs.push_back(line);
+                }
+            }
+            
+            res.set_content(logs.dump(), "application/json"); });
+
+        server_->Get(R"(/debug/(.+))", [](const httplib::Request &req, httplib::Response &res)
+                     {
+            string path = "debug_frames/" + req.matches[1].str();
+            
+            ifstream file(path, ios::binary);
+            if (!file) {
+                res.status = 404;
+                return;
+            }
+            
+            string content((istreambuf_iterator<char>(file)), istreambuf_iterator<char>());
+            res.set_content(content, "image/jpeg"); });
+
+        server_->Get("/info", [](const httplib::Request &req, httplib::Response &res)
+                     {
+            ifstream file("cache/info.json");
+            if (!file) {
+                res.set_content("{\"error\":\"info.json not found\"}", "application/json");
+                return;
+            }
+            
+            string content((istreambuf_iterator<char>(file)), istreambuf_iterator<char>());
+            res.set_content(content, "application/json"); });
 
         // Start server thread
         thread server_thread([&]()
                              {
             log_info("WebSocket server listening on ws://0.0.0.0:" + to_string(port_) + "/scores");
+            log_info("Rest server listening on http://0.0.0.0:" + to_string(port_) + "/");
             server_->listen("0.0.0.0", port_); });
 
         // MAIN BROADCASTING LOOP - this is where the magic happens!
