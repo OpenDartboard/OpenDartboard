@@ -7,11 +7,12 @@
 
 <div align="center">
 
-[![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](https://github.com/opendartboard/opendartboard)
-[![Versions](https://img.shields.io/badge/versions-v0.1.3-green.svg)](https://github.com/opendartboard/opendartboard)
+[![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](https://github.com/OpenDartboard/OpenDartboard/blob/main/LICENSE)
+[![Versions](https://img.shields.io/badge/versions-v0.1.3-green.svg)](https://github.com/OpenDartboard/OpenDartboard/releases)
 [![Platform](https://img.shields.io/badge/platform-arm64-orange.svg)](https://github.com/opendartboard/opendartboard)
 [![Language](https://img.shields.io/badge/Language-C++-pink.svg)](https://github.com/opendartboard/opendartboard)
 [![Libs](https://img.shields.io/badge/Libs-OpenCV_•_httplib_•_json-white.svg)](https://github.com/opendartboard/opendartboard)
+[![Discord](https://img.shields.io/badge/Discord-Join-7289da.svg)](https://discord.gg/b8YwrbN2ju)
 
 </div>
 
