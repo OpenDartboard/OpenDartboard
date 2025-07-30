@@ -1,8 +1,6 @@
-<!-- markdownlint-disable-next-line -->
-<p align="center" style="font-size: 1.2em; max-width: 700px; margin: auto; border: 1px solid #; padding: 12px; border-radius: 8px; background-color: #ff9100ff; margin-bottom: 40px; color: #fff;">
-  <strong>Notice:</strong> This project is in very early development and is not yet ready for production use. Expect bugs, missing features, and rough edges. Your feedback is welcome!
-</p>
+> [!WARNING] > **Notice:** This project is in very early development and is not yet ready for production use. Expect bugs, missing features, and rough edges. Your feedback is welcome!
 
+<!-- markdownlint-disable-next-line -->
 <p align="center">
   <a href="https://opendartboard.org/" rel="noopener" target="_blank"><img width="192" height="204" src="assets/logo2.png" alt="Opendartboard Logo"></a>
 </p>
