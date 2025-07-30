@@ -1,4 +1,7 @@
-> [!WARNING] > **Notice:** This project is in very early development and is not yet ready for production use. Expect bugs, missing features, and rough edges. Your feedback is welcome!
+<div align="center">
+<a href="https://opendartboard.org/" rel="noopener" target="_blank"><img src="https://img.shields.io/badge/NOTICE:-This_project_is_in_early_development_and_not_ready_for_production_use!-orange.svg" alt="Opendartboard Logo"></a>
+<p> </p>
+</div>
 
 <!-- markdownlint-disable-next-line -->
 <p align="center">
