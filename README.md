@@ -5,7 +5,7 @@
 
 <!-- markdownlint-disable-next-line -->
 <p align="center">
-  <a href="https://opendartboard.org/" rel="noopener" target="_blank"><img width="192" height="204" src="assets/logo2.png" alt="Opendartboard Logo"></a>
+  <a href="http://opendartboard.org/" rel="noopener" target="_blank"><img width="192" height="204" src="assets/logo2.png" alt="Opendartboard Logo"></a>
 </p>
 
 <h1 align="center">OpenDartboard</h1>
@@ -14,7 +14,7 @@
 
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](https://github.com/OpenDartboard/OpenDartboard/blob/main/LICENSE)
 [![Versions](https://img.shields.io/badge/versions-v0.1.3-green.svg)](https://github.com/OpenDartboard/OpenDartboard/releases)
-[![Platform](https://img.shields.io/badge/platform-arm64-orange.svg)](https://github.com/opendartboard/opendartboard)
+[![Platform](https://img.shields.io/badge/platform-arm64-red.svg)](https://github.com/opendartboard/opendartboard)
 [![Language](https://img.shields.io/badge/Language-C++-pink.svg)](https://github.com/opendartboard/opendartboard)
 [![Libs](https://img.shields.io/badge/Libs-OpenCV_•_httplib_•_json-white.svg)](https://github.com/opendartboard/opendartboard)
 [![Discord](https://img.shields.io/badge/Discord-Join-7289da.svg)](https://discord.gg/b8YwrbN2ju)
@@ -65,7 +65,7 @@ sudo apt install -y ./opendartboard_0.1.3-1_arm64.deb
 opendartboard --autocams
 ```
 
-> **Tip**: Need a quick debug dashboard? Run [`opendartboard.github.io/debug`](https://opendartboard.github.io/debug/) in any modern browser to see the score output, camera feeds, calibrations images, and more.
+> **Tip**: Need a quick debug dashboard? Run [`debug.opendartboard.org`](http://debug.opendartboard.org) in any modern browser to see the score output, camera feeds, calibrations images, and more.
 
 ## Clients
 
@@ -82,7 +82,7 @@ opendartboard --autocams
 - **TV's**:    [COMMING SOON] - A TV client for viewing scores on your big screen.
 ```
 
-For now, you can try out the [Debug Dashboard](https://opendartboard.github.io/debug/) or integrate with your own applications using the [WebSocket API](docs/api.md).
+For now, you can try out the [Debug Dashboard](http://debug.opendartboard.org) or integrate with your own applications using the [WebSocket API](docs/api.md).
 
 ## Project Status & Roadmap
 
