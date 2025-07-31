@@ -12,10 +12,13 @@ build:
 	@cp build/opendartboard /usr/local/bin/opendartboard
 	@echo "\033[32mBuild completed successfully!\033[0m"
 
-run:
+run-mocks:
 	opendartboard --debug \
 		--cams mocks/cam_1.mp4,mocks/cam_2.mp4,mocks/cam_3.mp4 \
 		--width 1280 --height 720
+
+run:
+	opendartboard --debug --autocams --width 1280 --height 720 --fps 30
 
 deb:
 ifndef VERSION

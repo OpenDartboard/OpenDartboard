@@ -89,6 +89,9 @@ namespace logging
         }
     }
 
+// no instance of overloaded function "std::to_string" matches the argument list
+#define log_string_src(value) ("\033[36m" + value + "\033[0m")
+
 // Helper macro to format numbers with color (blue highlight instead of purple)
 // This works for any type that has to_string() support
 #define log_string(value) ("\033[36m" + std::to_string(value) + "\033[0m")

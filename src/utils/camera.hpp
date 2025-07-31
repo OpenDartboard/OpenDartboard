@@ -31,6 +31,18 @@ namespace camera
         return false;
     }
 
+    // Simple function to decote fourcc code to a human-readable string
+    inline string decodeFourCC(int fourcc)
+    {
+        char code[5];
+        code[0] = (fourcc & 0xFF);
+        code[1] = (fourcc >> 8) & 0xFF;
+        code[2] = (fourcc >> 16) & 0xFF;
+        code[3] = (fourcc >> 24) & 0xFF;
+        code[4] = '\0';
+        return string(code);
+    }
+
     // Initialize cameras based on provided sources
     inline bool initializeCameras(vector<VideoCapture> &cameras, const vector<string> &camera_sources, int width, int height, int fps)
     {
@@ -67,16 +79,37 @@ namespace camera
             }
             else
             {
-                cap.open(camera_sources[i]);
+                cap.open(camera_sources[i], CAP_V4L2);
                 cap.set(CAP_PROP_FRAME_WIDTH, width);
                 cap.set(CAP_PROP_FRAME_HEIGHT, height);
                 cap.set(CAP_PROP_FPS, fps);
+                // Set MJPEG codec for better performance
+                int fourcc = VideoWriter::fourcc('M', 'J', 'P', 'G'); // MJPEG codec
+                cap.set(CAP_PROP_FOURCC, fourcc);                     // Set MJPEG codec
+
+                log_debug("Opened camera " + log_string(i + 1) + " at " + log_string(width) + "x" + log_string(height) + " @ " + log_string(fps) + " FPS" +
+                          " (FOURCC: " + log_string_src(decodeFourCC(fourcc)) + ")");
             }
 
             if (!cap.isOpened())
             {
                 log_error("Failed to open camera/video " + camera_sources[i]);
                 return false;
+            }
+
+            // Verify camera properties after opening
+            if (!isVideoFile(camera_sources[i]))
+            {
+                double actual_width = cap.get(CAP_PROP_FRAME_WIDTH);
+                double actual_height = cap.get(CAP_PROP_FRAME_HEIGHT);
+                double actual_fps = cap.get(CAP_PROP_FPS);
+                double fourcc = cap.get(CAP_PROP_FOURCC);
+
+                log_debug("Camera " + log_string(i + 1) + " verification:");
+                log_debug("  Resolution: " + log_string((int)actual_width) + "x" + log_string((int)actual_height) + " (expected: " + log_string(width) + "x" + log_string(height) + ")");
+                log_debug("  FPS: " + log_string((int)actual_fps) + " (expected: " + log_string(fps) + ")");
+                log_debug("  FOURCC: " + log_string_src(decodeFourCC(fourcc)) + " (expected: " + log_string_src(decodeFourCC(VideoWriter::fourcc('M', 'J', 'P', 'G'))) + ")");
+                log_debug("  Backend: " + log_string_src(cap.getBackendName()) + " (expected: " + log_string_src((string) "V4L2") + ")");
             }
 
             cameras.push_back(cap);
@@ -86,7 +119,7 @@ namespace camera
         return cameras.size() > 0;
     }
 
-    // Capture frames from all cameras with resizing if needed
+    // Capture frames from all cameras
     inline vector<Mat> captureFrames(vector<VideoCapture> &cameras)
     {
         vector<Mat> frames;
@@ -99,7 +132,6 @@ namespace camera
 
             if (success && !frame.empty())
             {
-                // capture frame
                 frames.push_back(frame);
             }
             else
@@ -166,85 +198,4 @@ namespace camera
         return averagedFrames;
     }
 
-    // Helper function for motion detection - convert frame to grayscale
-    inline Mat convertToGrayscale(const Mat &frame)
-    {
-        Mat gray;
-        if (frame.channels() == 3)
-        {
-            cvtColor(frame, gray, COLOR_BGR2GRAY);
-        }
-        else
-        {
-            gray = frame.clone();
-        }
-        return gray;
-    }
-
-    // Helper function for motion detection - apply threshold and morphology
-    inline Mat applyMotionThreshold(const Mat &frame1, const Mat &frame2)
-    {
-        // Check if frames have the same size and type
-        if (frame1.size() != frame2.size() || frame1.type() != frame2.type())
-        {
-            log_error("Frame size or type mismatch in motion detection: " + to_string(frame1.cols) + "x" + to_string(frame1.rows) + " vs " + to_string(frame2.cols) + "x" + to_string(frame2.rows));
-            return Mat(); // Return empty matrix
-        }
-
-        // Calculate absolute difference
-        Mat diff;
-        absdiff(frame1, frame2, diff);
-
-        // Apply threshold
-        Mat thresh;
-        threshold(diff, thresh, 25, 255, THRESH_BINARY);
-
-        // Apply morphological operations to reduce noise
-        Mat kernel = getStructuringElement(MORPH_RECT, Size(5, 5));
-        morphologyEx(thresh, thresh, MORPH_CLOSE, kernel);
-
-        return thresh;
-    }
-
-    // Detect motion between current and previous frames using proper threshold calculation
-    inline bool detectMotion(const vector<Mat> &current_frames, const vector<Mat> &previous_frames, double threshold_ratio = 0.05)
-    {
-        if (current_frames.size() != previous_frames.size() || current_frames.empty())
-        {
-            return false;
-        }
-
-        for (size_t i = 0; i < current_frames.size(); i++)
-        {
-            if (current_frames[i].empty() || previous_frames[i].empty())
-            {
-                continue;
-            }
-
-            // Convert to grayscale
-            Mat prev_gray = convertToGrayscale(previous_frames[i]);
-            Mat curr_gray = convertToGrayscale(current_frames[i]);
-
-            // Get motion mask
-            Mat motion_mask = applyMotionThreshold(prev_gray, curr_gray);
-
-            // Skip if motion_mask is empty (error occurred)
-            if (motion_mask.empty())
-            {
-                continue;
-            }
-
-            // Count motion pixels and calculate ratio
-            int motion_pixels = countNonZero(motion_mask);
-            int total_pixels = motion_mask.rows * motion_mask.cols;
-            double motion_ratio = (double)motion_pixels / total_pixels;
-
-            if (motion_ratio > threshold_ratio)
-            {
-                return true; // Motion detected on this camera
-            }
-        }
-
-        return false; // No motion detected on any camera
-    }
 }

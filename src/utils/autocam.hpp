@@ -6,6 +6,7 @@
 #include <dirent.h>
 #include <fcntl.h>
 #include <linux/videodev2.h>
+#include <map>
 #include <stdexcept>
 #include <string>
 #include <sys/ioctl.h>
@@ -23,7 +24,8 @@ namespace autocam
 
         v4l2_capability cap{};
         bool ok = (::ioctl(fd, VIDIOC_QUERYCAP, &cap) == 0) &&
-                  (cap.device_caps & V4L2_CAP_VIDEO_CAPTURE);
+                  (cap.device_caps & V4L2_CAP_VIDEO_CAPTURE) &&
+                  (cap.device_caps & V4L2_CAP_STREAMING);
         ::close(fd);
         return ok;
     }
@@ -116,9 +118,33 @@ namespace autocam
         parm.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         parm.parm.capture.timeperframe = {1, static_cast<unsigned int>(fps)};
         ::ioctl(fd, VIDIOC_S_PARM, &parm);
-
         ::close(fd);
         return true;
+    }
+
+    inline std::tuple<int, int, int> getActualSettings(const std::string &dev)
+    {
+        int fd = ::open(dev.c_str(), O_RDWR);
+        if (fd < 0)
+            return {0, 0, 0};
+
+        v4l2_format fmt{};
+        fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+        if (::ioctl(fd, VIDIOC_G_FMT, &fmt) < 0)
+        {
+            ::close(fd);
+            return {0, 0, 0};
+        }
+
+        v4l2_streamparm parm{};
+        parm.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+        ::ioctl(fd, VIDIOC_G_PARM, &parm);
+
+        int actualFps = parm.parm.capture.timeperframe.denominator /
+                        parm.parm.capture.timeperframe.numerator;
+
+        ::close(fd);
+        return {fmt.fmt.pix.width, fmt.fmt.pix.height, actualFps};
     }
 
     inline std::vector<std::string>
@@ -129,14 +155,20 @@ namespace autocam
         if (!d)
             throw std::runtime_error("opendir /dev failed");
 
+        if (verbose)
+            std::fprintf(stderr, "Scanning /dev for video devices...\n");
+
         struct dirent *e;
         while ((e = ::readdir(d)))
         {
             if (std::strncmp(e->d_name, "video", 5) == 0)
             {
                 std::string dev = "/dev/" + std::string(e->d_name);
+
                 if (!isVideoCapture(dev))
+                {
                     continue;
+                }
                 if (configureCam(dev, width, height, fps, verbose))
                 {
                     found.push_back(dev);
@@ -147,6 +179,45 @@ namespace autocam
         }
         ::closedir(d);
         std::sort(found.begin(), found.end());
+
+        if (verbose)
+        {
+            std::fprintf(stderr, "Found %d compatible camera(s) with actual settings:\n", (int)found.size());
+            for (const auto &cam : found)
+            {
+                auto [w, h, fps] = getActualSettings(cam);
+                std::fprintf(stderr, " ─ %s: %dx%d @ %d FPS\n", cam.c_str(), w, h, fps);
+
+                // Show supported modes grouped by resolution
+                int fd = ::open(cam.c_str(), O_RDWR);
+                if (fd >= 0)
+                {
+                    auto modes = listMjpgModes(fd);
+                    std::map<std::pair<int, int>, std::vector<int>> resolutionMap;
+
+                    // Group fps by resolution
+                    for (const auto &mode : modes)
+                    {
+                        std::pair<int, int> res = {std::get<0>(mode), std::get<1>(mode)};
+                        resolutionMap[res].push_back(std::get<2>(mode));
+                    }
+
+                    // Print grouped modes
+                    for (const auto &[resolution, fpsValues] : resolutionMap)
+                    {
+                        std::fprintf(stderr, " ─── [%dx%d @ ", resolution.first, resolution.second);
+                        for (size_t i = 0; i < fpsValues.size(); ++i)
+                        {
+                            if (i > 0)
+                                std::fprintf(stderr, "/");
+                            std::fprintf(stderr, "%dfps", fpsValues[i]);
+                        }
+                        std::fprintf(stderr, "]\n");
+                    }
+                    ::close(fd);
+                }
+            }
+        }
 
         if ((int)found.size() < maxCams)
             throw std::runtime_error("[autocam] only " + std::to_string(found.size()) +

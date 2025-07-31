@@ -72,6 +72,9 @@
     "filesystem": "cpp",
     "__tree": "cpp",
     "numeric": "cpp",
-    "random": "cpp"
+    "random": "cpp",
+    "iomanip": "cpp",
+    "regex": "cpp",
+    "__memory": "cpp"
   }
 }
