@@ -188,16 +188,12 @@ namespace score_processing
         case dart_processing::DartBoardState::DART_1:
         case dart_processing::DartBoardState::DART_2:
         case dart_processing::DartBoardState::DART_3:
-            // Find the best camera with a detected tip
-            int best_camera = -1;
-            Point2f best_tip_position(-1, -1);
-            Point2f best_center_position(-1, -1);
-
-            vector<Mat> points_on_screen; // For debug images
+            // Collect scores from all cameras with detected tips
+            vector<pair<string, int>> camera_scores; // (score, camera_index)
+            vector<Mat> points_on_screen;            // For debug images
 
             for (size_t i = 0; i < dart_result.camera_results.size(); i++)
             {
-
                 log_debug("-------");
                 string score_test = getScoreAtPoint(dart_result.camera_results[i].tip_position, calibrations[i]);
                 log_debug("-------");
@@ -218,12 +214,9 @@ namespace score_processing
                     points_on_screen.push_back(some_mat);
                 }
 
-                if (dart_result.camera_results[i].tip_found)
+                if (dart_result.camera_results[i].tip_found && score_test != "MISS")
                 {
-                    best_camera = static_cast<int>(i);
-                    best_tip_position = dart_result.camera_results[i].tip_position;
-                    best_center_position = dart_result.camera_results[i].center_position;
-                    // break; // Take the first camera with a tip
+                    camera_scores.push_back({score_test, static_cast<int>(i)});
                 }
             }
 
@@ -239,30 +232,57 @@ namespace score_processing
                 }
             }
 
-            if (best_camera >= 0)
+            if (!camera_scores.empty())
             {
+                // Consensus scoring logic
+                string final_score;
+                int best_camera = -1;
 
-                // WE HAVE A DART TIP! Mock scoring for now 🎯
-                vector<string> mock_scores = {
-                    "S20", "S1", "S18", "S4", "S13", "S6", "S10", "S15", "S2", "S17",
-                    "S3", "S19", "S7", "S16", "S8", "S11", "S14", "S9", "S12", "S5",
-                    "D20", "D1", "D18", "D4", "D13", "D6", "D10", "D15", "D2", "D17",
-                    "D3", "D19", "D7", "D16", "D8", "D11", "D14", "D9", "D12", "D5",
-                    "T20", "T1", "T18", "T4", "T13", "T6", "T10", "T15", "T2", "T17",
-                    "T3", "T19", "T7", "T16", "T8", "T11", "T14", "T9", "T12", "T5",
-                    "BULL", "OUTER"};
+                // Count occurrences of each score
+                map<string, vector<int>> score_cameras;
+                for (const auto &[score, camera_idx] : camera_scores)
+                {
+                    score_cameras[score].push_back(camera_idx);
+                }
 
-                result.score = mock_scores[rand() % mock_scores.size()];
-                result.pixel_position = best_tip_position;
-                result.center_position = best_center_position;
-                result.dartboard_position = best_tip_position; // TODO: Convert to dartboard coordinates
-                result.confidence = 0.9f;
+                // Look for consensus (2+ cameras agreeing)
+                string consensus_score;
+                int max_consensus = 0;
+                for (const auto &[score, cameras] : score_cameras)
+                {
+                    if (cameras.size() >= 2 && cameras.size() > max_consensus)
+                    {
+                        consensus_score = score;
+                        max_consensus = cameras.size();
+                    }
+                }
+
+                if (!consensus_score.empty())
+                {
+                    // Use consensus score, pick first camera from the group
+                    final_score = consensus_score;
+                    best_camera = score_cameras[consensus_score][0];
+                    log_info("Consensus score: " + final_score + " from " + to_string(max_consensus) + " cameras");
+                }
+                else
+                {
+                    // No consensus, use first available score
+                    final_score = camera_scores[0].first;
+                    best_camera = camera_scores[0].second;
+                    log_info("No consensus, using single camera score: " + final_score + " from camera " + to_string(best_camera));
+                }
+
+                result.score = final_score;
+                result.pixel_position = dart_result.camera_results[best_camera].tip_position;
+                result.center_position = dart_result.camera_results[best_camera].center_position;
+                result.dartboard_position = dart_result.camera_results[best_camera].tip_position; // TODO: Convert to dartboard coordinates
+                result.confidence = consensus_score.empty() ? 0.7f : 0.9f;
                 result.camera_index = best_camera;
                 result.valid = true;
             }
             else
             {
-                // State changed but no tip found
+                // State changed but no valid scores found
                 result.score = "MISS";
                 result.confidence = 0.5f;
                 result.camera_index = -1;
@@ -270,7 +290,7 @@ namespace score_processing
 
                 if (debug_mode)
                 {
-                    log_warning("State changed but no tip found! State: ");
+                    log_warning("State changed but no valid scores found!");
                 }
             }
             break;
